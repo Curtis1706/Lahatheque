@@ -1036,11 +1036,17 @@ class LegalContractsListView(APIView):
         if not contracting_party:
             contracting_party = "Partie Contractante"
 
-        # Traitement du fichier PDF/DOCX
+        # Traitement du fichier PDF/DOCX (Obligatoire)
         from apps.rights.services.ocr_service import extract_text_from_document, MIN_NATIVE_CHARS_THRESHOLD
         from apps.rights.tasks.ocr_tasks import trigger_contract_ocr
 
         uploaded_file = request.FILES.get("file")
+        if not uploaded_file:
+            return Response({
+                "success": False,
+                "error": "Le téléversement du document officiel (PDF ou Word) est obligatoire pour enregistrer un contrat."
+            }, status=400)
+
         saved_path = ""
         file_name = request.data.get("file_name", "")
         file_size = int(request.data.get("file_size", 0))

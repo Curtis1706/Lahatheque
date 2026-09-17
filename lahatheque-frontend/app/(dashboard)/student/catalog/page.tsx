@@ -663,14 +663,15 @@ function StudentCatalogContent() {
       <div className="space-y-6">
         {!loading && catalogData && (
           <div className="flex items-center justify-between gap-4 flex-wrap">
-            <p className="text-xs text-foreground-muted">
-              <strong className="text-navy font-bold">{totalBooks}</strong> ouvrage{totalBooks > 1 ? "s" : ""} disponible{totalBooks > 1 ? "s" : ""}
-              {debouncedQ && (
-                <span>
-                  {" "}pour « <strong className="text-navy">{debouncedQ}</strong> »
-                </span>
-              )}
-            </p>
+            {debouncedQ ? (
+              <p className="text-xs text-foreground-muted">
+                <strong className="text-navy font-bold">{totalBooks}</strong> résultat{totalBooks > 1 ? "s" : ""} pour « <strong className="text-navy">{debouncedQ}</strong> »
+              </p>
+            ) : (
+              <p className="text-xs text-foreground-muted font-medium">
+                Ouvrages disponibles au catalogue académique
+              </p>
+            )}
 
             {totalPages > 1 && (
               <span className="text-xs text-foreground-muted font-medium">

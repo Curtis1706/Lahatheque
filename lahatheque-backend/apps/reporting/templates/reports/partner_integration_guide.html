@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Guide d'Intégration Partenaire • Mode Catalogue Seul • LAHAThèque</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Poppins:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+
+    :root {
+      --color-navy: #1B2A4E;
+      --color-navy-dark: #0F1A33;
+      --color-navy-hover: #2E3F66;
+      --color-gold: #B08D42;
+      --color-background: #FFFFFF;
+      --color-background-secondary: #F8FAFC;
+      --color-border: #E2E8F0;
+      --color-text-main: #1E293B;
+      --color-text-muted: #64748B;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Poppins', sans-serif;
+      background-color: var(--color-background);
+      color: var(--color-text-main);
+      line-height: 1.6;
+      padding: 40px;
+      font-size: 14px;
+    }
+
+    .header-banner {
+      background: var(--color-navy);
+      color: #FFFFFF;
+      padding: 30px 40px;
+      border-radius: 8px;
+      border-bottom: 4px solid var(--color-gold);
+      margin-bottom: 35px;
+    }
+
+    .header-banner h1 {
+      font-family: 'Playfair Display', serif;
+      font-size: 26px;
+      font-weight: 700;
+      color: #FFFFFF;
+      margin-bottom: 8px;
+    }
+
+    .header-banner p {
+      font-size: 13px;
+      color: var(--color-gold);
+      font-weight: 500;
+      letter-spacing: 0.5px;
+    }
+
+    h2 {
+      font-family: 'Playfair Display', serif;
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--color-navy);
+      border-bottom: 2px solid var(--color-border);
+      padding-bottom: 8px;
+      margin-top: 30px;
+      margin-bottom: 16px;
+    }
+
+    h3 {
+      font-family: 'Poppins', sans-serif;
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--color-navy);
+      margin-top: 20px;
+      margin-bottom: 10px;
+    }
+
+    p {
+      margin-bottom: 14px;
+      color: var(--color-text-main);
+    }
+
+    ul, ol {
+      margin-left: 24px;
+      margin-bottom: 16px;
+    }
+
+    li {
+      margin-bottom: 6px;
+    }
+
+    .callout {
+      background: var(--color-background-secondary);
+      border-left: 4px solid var(--color-gold);
+      padding: 14px 18px;
+      border-radius: 0 6px 6px 0;
+      margin-bottom: 20px;
+      font-size: 13px;
+    }
+
+    .code-block {
+      background: var(--color-navy-dark);
+      color: #E2E8F0;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      padding: 16px;
+      border-radius: 6px;
+      border: 1px solid var(--color-navy-hover);
+      margin-bottom: 20px;
+      overflow-x: auto;
+      white-space: pre;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 24px;
+      font-size: 13px;
+    }
+
+    th, td {
+      border: 1px solid var(--color-border);
+      padding: 10px 14px;
+      text-align: left;
+    }
+
+    th {
+      background: var(--color-navy);
+      color: #FFFFFF;
+      font-weight: 600;
+    }
+
+    tr:nth-child(even) {
+      background: var(--color-background-secondary);
+    }
+
+    .footer {
+      margin-top: 50px;
+      padding-top: 20px;
+      border-top: 1px solid var(--color-border);
+      font-size: 11px;
+      color: var(--color-text-muted);
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header-banner">
+    <h1>Guide d'Intégration Partenaire • Mode Catalogue Seul</h1>
+    <p>Éditions LAHA • Plateforme Académique LAHAThèque • Version 2.0</p>
+  </div>
+
+  <div class="callout">
+    <strong>Public cible :</strong> Développeurs, architectes logiciels et administrateurs techniques de portails universitaires, LMS et bibliothèques partenaires intégrant le catalogue académique officiel LAHAThèque et la liseuse sécurisée.
+  </div>
+
+  <h2>1. Principes & Fonctionnement</h2>
+  <p>Le mode d'accès « Catalogue Seul » permet à votre système d'information académique de :</p>
+  <ul>
+    <li><strong>Explorer et synchroniser le catalogue :</strong> Récupérer les métadonnées officielles des ouvrages (titres, auteurs, résumés, disciplines, ISBN, couvertures).</li>
+    <li><strong>Vérifier les licences des bouquets :</strong> Contrôler en temps réel l'inclusion d'un ouvrage dans les bouquets souscrits par votre université.</li>
+    <li><strong>Instancier des sessions de lecture sécurisées :</strong> Générer une URL de liseuse éphémère et filigranée en un clic pour vos étudiants via l'API, sans création de compte supplémentaire.</li>
+    <li><strong>Personnaliser la liseuse :</strong> Appliquer l'identité visuelle de votre établissement (logo, nom, palette de couleurs).</li>
+    <li><strong>Consulter les statistiques d'usage :</strong> Suivre les métriques de consultation de votre campus.</li>
+  </ul>
+
+  <h2>2. Le Flux d'Intégration en 4 Étapes</h2>
+  <ol>
+    <li><strong>Authentification Machine-to-Machine :</strong> Échangez votre <code>Client ID</code> et votre <code>Client Secret</code> contre un jeton Bearer OAuth 2.0 (valide 10 heures) sur <code>POST /api/v1/oauth2/token/</code>.</li>
+    <li><strong>Exploration du Catalogue :</strong> Consultez la liste des ouvrages éligibles via <code>GET /api/v1/partner/catalog/</code>.</li>
+    <li><strong>Création d'une Session de Lecture :</strong> Initiez une session de lecture sécurisée avec <code>POST /api/v1/reader/sessions/</code> en transmettant le <code>book_id</code> et les informations de l'étudiant.</li>
+    <li><strong>Ouverture de la Liseuse :</strong> Redirigez l'étudiant vers l'URL sécurisée retournée (<code>reader_url</code>).</li>
+  </ol>
+
+  <h2>3. Pré-requis & Variables d'Environnement</h2>
+  <p>Insérez les variables suivantes dans votre fichier <code>.env</code> ou votre gestionnaire de secrets applicatifs :</p>
+  <div class="code-block">LAHATHEQUE_CLIENT_ID={{ client_id }}
+LAHATHEQUE_CLIENT_SECRET={{ client_secret }}
+LAHATHEQUE_API_URL=https://api.lahatheque.com/api/v1</div>
+
+  <h2>4. Personnalisation de la Liseuse (Objet theme)</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Propriété</th>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>brand_name</code></td>
+        <td>String (2-50 car.)</td>
+        <td>Nom de votre université affiché dans la barre d'outils supérieure.</td>
+      </tr>
+      <tr>
+        <td><code>brand_logo_url</code></td>
+        <td>URL HTTPS (PNG/SVG)</td>
+        <td>Logo officiel de l'établissement.</td>
+      </tr>
+      <tr>
+        <td><code>primary_color</code></td>
+        <td>Code HEX (ex: #1B2A4E)</td>
+        <td>Couleur principale de la barre d'outils.</td>
+      </tr>
+      <tr>
+        <td><code>accent_color</code></td>
+        <td>Code HEX (ex: #B08D42)</td>
+        <td>Couleur d'accentuation dorée des boutons actifs et de la pagination.</td>
+      </tr>
+      <tr>
+        <td><code>background_color</code></td>
+        <td>Code HEX (ex: #0F1A33)</td>
+        <td>Couleur de fond du cadre de lecture.</td>
+      </tr>
+      <tr>
+        <td><code>text_color</code></td>
+        <td>Code HEX (ex: #FFFFFF)</td>
+        <td>Couleur de contraste du texte et des icônes.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>5. Référence Technique des Endpoints</h2>
+  <h3>5.1 Demande de jeton OAuth 2.0</h3>
+  <div class="code-block">POST /api/v1/oauth2/token/
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=client_credentials&client_id=VOTRE_CLIENT_ID&client_secret=VOTRE_CLIENT_SECRET</div>
+
+  <h3>5.2 Consultation du Catalogue Partenaire</h3>
+  <div class="code-block">GET /api/v1/partner/catalog/?discipline=droit&search=civil
+Authorization: Bearer &lt;access_token&gt;</div>
+
+  <h3>5.3 Création d'une Session de Lecture</h3>
+  <div class="code-block">POST /api/v1/reader/sessions/
+Authorization: Bearer &lt;access_token&gt;
+Content-Type: application/json
+
+{
+  "book_id": "uuid-du-livre",
+  "external_user_id": "ETU-2026-9988",
+  "user_display_name": "Jean Dupont",
+  "user_email": "jean.dupont@universite.bj",
+  "theme": {
+    "brand_name": "Université d'Abomey-Calavi",
+    "primary_color": "#1B2A4E",
+    "accent_color": "#B08D42"
+  }
+}</div>
+
+  <h2>6. Bonnes Pratiques de Sécurité</h2>
+  <ul>
+    <li><strong>Conservation du Secret Client :</strong> Ne stockez jamais le <code>client_secret</code> dans le code frontend (React, Vue, mobile). Tous les appels doivent être relayés par votre serveur backend.</li>
+    <li><strong>Sessions Éphémères :</strong> Les jetons de lecture sont à usage unique et sécurisés par signature cryptographique. Ne mettez pas en cache les URLs de lecture.</li>
+    <li><strong>Filigrane Dynamique :</strong> Chaque session est personnalisée avec le nom et l'email de l'apprenant pour prévenir la copie illicite.</li>
+  </ul>
+
+  <div class="footer">
+    Document officiel • LAHA Éditions &amp; LAHAThèque • Tous droits réservés
+  </div>
+
+</body>
+</html>

@@ -14,6 +14,7 @@ export interface PaginationProps {
   pageSizeOptions?: number[];
   className?: string;
   itemLabel?: string;
+  showTotalCount?: boolean;
 }
 
 export function Pagination({
@@ -26,6 +27,7 @@ export function Pagination({
   pageSizeOptions = [6, 9, 12, 24],
   className,
   itemLabel = "ouvrages",
+  showTotalCount = false,
 }: PaginationProps) {
   if (totalPages <= 1 && (!totalItems || totalItems <= (pageSize || 9))) {
     return null;
@@ -80,7 +82,7 @@ export function Pagination({
     >
       {/* Compteur & taille de page */}
       <div className="flex items-center gap-3 text-xs text-foreground-muted order-2 sm:order-1">
-        {totalItems !== undefined && (
+        {showTotalCount && totalItems !== undefined && (
           <p className="font-medium">
             Affichage de <strong className="text-navy">{startItem}</strong> à{" "}
             <strong className="text-navy">{endItem || totalItems}</strong> sur{" "}
@@ -89,7 +91,12 @@ export function Pagination({
         )}
 
         {onPageSizeChange && pageSize && (
-          <div className="hidden md:flex items-center gap-1.5 ml-2 pl-3 border-l border-border">
+          <div
+            className={cn(
+              "hidden md:flex items-center gap-1.5",
+              showTotalCount && totalItems !== undefined ? "ml-2 pl-3 border-l border-border" : ""
+            )}
+          >
             <span className="text-[11px] font-medium text-foreground-muted">Par page :</span>
             <select
               value={pageSize}

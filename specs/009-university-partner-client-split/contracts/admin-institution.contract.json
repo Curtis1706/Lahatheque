@@ -1,0 +1,25 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "AdminInstitutionPayload",
+  "description": "Contrat pour la création et modification d'une institution dans l'espace administration",
+  "type": "object",
+  "required": ["name", "code", "country", "institution_type"],
+  "properties": {
+    "name": { "type": "string", "minLength": 2 },
+    "code": { "type": "string", "minLength": 2, "maxLength": 50 },
+    "country": { "type": "string", "minLength": 2, "maxLength": 10, "default": "BJ" },
+    "institution_type": {
+      "type": "string",
+      "enum": ["partner", "client"],
+      "default": "client"
+    },
+    "royalty_rate": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "maximum": 100
+    },
+    "contract_reference": { "type": "string" },
+    "contact_email": { "type": "string", "format": "email" },
+    "contact_phone": { "type": "string" }
+  }
+}

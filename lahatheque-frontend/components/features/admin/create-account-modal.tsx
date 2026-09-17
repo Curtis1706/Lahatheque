@@ -16,15 +16,15 @@ export interface CreateAccountModalProps {
 }
 
 const ROLE_OPTIONS: { role: AdminRole; label: string; desc: string }[] = [
-  { role: "student", label: "Client Lecteur / Étudiant", desc: "Accès à la liseuse LCP DRM, abonnements et achats" },
+  { role: "student", label: "Espace Client", desc: "Accès à la liseuse LCP DRM, abonnements et achats numériques" },
+  { role: "wholesaler", label: "Grossiste", desc: "Commandes volumiques avec tarifs dégressifs institutionnels" },
+  { role: "university", label: "Université", desc: "Portail établissement (suivi des redevances ou abonnements campus)" },
   { role: "author", label: "Auteur", desc: "Consultation des droits propres, redevances et dépôts manuscrit" },
   { role: "publisher", label: "Éditeur Tiers", desc: "Portail éditeur, dépôts ONIX 3.0 et suivi financier" },
-  { role: "university", label: "Université Partenaire", desc: "Gestion des bouquets institutionnels, affiliations et redevances 15%" },
+  { role: "legal_reviewer", label: "Juriste / Relecteur", desc: "Validation des contrats, droits d'auteur et impayés" },
   { role: "layout_artist", label: "Maquettiste", desc: "Dépôt des épreuves PDF/EPUB et classification catalogue" },
   { role: "chief_layout", label: "Chef Maquettiste", desc: "Validation des épreuves et publication officielle" },
   { role: "manager", label: "Gestionnaire Stock & Livraison", desc: "Stock papier physique et suivi des livraisons" },
-  { role: "legal_reviewer", label: "Juriste", desc: "Validation des contrats, droits d'auteur et impayés" },
-  { role: "wholesaler", label: "Grossiste", desc: "Achats et commandes à tarifs dégressifs grossiste" },
 ];
 
 const normalizeAdminRole = (r?: string): AdminRole => {
@@ -71,6 +71,8 @@ export function CreateAccountModal({
   const [newInstName, setNewInstName] = useState("");
   const [newInstCode, setNewInstCode] = useState("");
   const [newInstCountry, setNewInstCountry] = useState("BJ");
+  // T019 : Type d'institution pour la création — Partenaire ou Cliente
+  const [newInstType, setNewInstType] = useState<'partner' | 'client'>('client');
   const [loadingInstitutions, setLoadingInstitutions] = useState(false);
 
   const isUniversityRole = selectedRole === "university";
@@ -134,15 +136,27 @@ export function CreateAccountModal({
           payload.institution_name = newInstName.trim();
           payload.institution_code = newInstCode.trim();
           payload.institution_country = newInstCountry;
+          // T019 : Envoyer le type d'institution choisi par l'admin
+          payload.institution_type = newInstType;
         }
       }
 
+      console.info("[ADMIN INSTITUTION]", new Date().toISOString(), "- Création compte rôle :", payload.role, "Type inst :", payload.institution_type ?? "N/A");
       const res = await createAdminUser(payload);
 
       if (res.success) {
         setStep(3);
         toast.success("Compte utilisateur créé avec succès !");
         onSuccess?.();
+      } else if (res.error?.includes('SC-002') || res.error?.includes('modérateur actif') || (res as any).status === 409) {
+        // T019 : Gestion 409 — doublon de modérateur
+        const existingEmail = (res as any).data?.existing_moderator_email;
+        toast.error(
+          existingEmail
+            ? `Cette institution possède déjà un modérateur actif (${existingEmail}). Désactivez-le d'abord.`
+            : res.error || "Cette institution possède déjà un compte modérateur actif.",
+          { duration: 6000 }
+        );
       } else {
         toast.error(res.error || "Erreur lors de la création du compte.");
         if (res.suggestion_id) {
@@ -165,12 +179,16 @@ export function CreateAccountModal({
   };
 
   const handleResetAndClose = () => {
+    if (step === 3) {
+      onSuccess?.();
+    }
     setStep(1);
     setFormData({ firstName: "", lastName: "", email: "", phone: "", country: "BJ", institutionName: "" });
     setSelectedInstitutionId("");
     setNewInstName("");
     setNewInstCode("");
     setNewInstCountry("BJ");
+    setNewInstType('client');
     setInstitutionMode("existing");
     onClose();
   };
@@ -294,7 +312,7 @@ export function CreateAccountModal({
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="text-xs font-medium text-foreground">Téléphone</label>
                 <div className="mt-1">
@@ -311,7 +329,7 @@ export function CreateAccountModal({
                 <select
                   value={formData.country}
                   onChange={(e) => setFormData({ ...formData, country: e.target.value })}
-                  className="w-full mt-1 p-2.5 text-xs rounded-xl bg-background border border-border focus:border-gold focus:outline-none"
+                  className="w-full mt-1 p-2.5 text-xs rounded-xl bg-background border border-border focus:border-gold focus:outline-none min-h-[44px]"
                 >
                   <option value="BJ">Bénin (BJ)</option>
                   <option value="CI">Côte d'Ivoire (CI)</option>
@@ -431,10 +449,48 @@ export function CreateAccountModal({
                         </select>
                       </div>
                     </div>
-                    <div className="flex items-center gap-1.5 p-2 rounded-lg bg-gold/10 border border-gold/20 text-[10px] text-navy">
-                      <Building2 className="w-3 h-3 text-gold shrink-0" />
-                      <span>Taux conventionné : <strong>15%</strong> appliqué par défaut. Modifiable depuis Administration &rsaquo; Redevances.</span>
+
+                    {/* T019 : Sélecteur Partenaire / Cliente */}
+                    <div>
+                      <label className="text-[11px] font-medium text-foreground">Type d'institution *</label>
+                      <div className="flex gap-2 mt-1">
+                        <button
+                          type="button"
+                          onClick={() => setNewInstType('client')}
+                          className={`flex-1 py-2 rounded-xl text-xs font-semibold border transition-colors ${
+                            newInstType === 'client'
+                              ? 'bg-navy text-white border-navy'
+                              : 'bg-background border-border text-foreground-muted hover:border-navy'
+                          }`}
+                        >
+                          Cliente (Souscriptrice)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setNewInstType('partner')}
+                          className={`flex-1 py-2 rounded-xl text-xs font-semibold border transition-colors ${
+                            newInstType === 'partner'
+                              ? 'bg-gold text-navy border-gold'
+                              : 'bg-background border-border text-foreground-muted hover:border-gold'
+                          }`}
+                        >
+                          Partenaire (Ayant droit)
+                        </button>
+                      </div>
+                      <p className="text-[10px] text-foreground-muted mt-1">
+                        {newInstType === 'partner'
+                          ? 'Taux conventionné 15% appliqué. L\'institution bénéficie des redevances sur les ventes.'
+                          : 'Pas de redevances (taux 0%). L\'institution souscrit des bouquets documentaires.'}
+                      </p>
                     </div>
+
+                    {/* Afficher l'info taux uniquement pour les partenaires */}
+                    {newInstType === 'partner' && (
+                      <div className="flex items-center gap-1.5 p-2 rounded-lg bg-gold/10 border border-gold/20 text-[10px] text-navy">
+                        <Building2 className="w-3 h-3 text-gold shrink-0" />
+                        <span>Taux conventionné : <strong>15%</strong> appliqué par défaut. Modifiable depuis Administration &rsaquo; Redevances.</span>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

@@ -484,8 +484,8 @@ export default function NewPublisherBookPage() {
 
       toast.success("L'ouvrage, son manuscrit et sa couverture ont été enregistrés avec succès dans la base de données.");
       router.push("/publisher/catalog");
-    } catch {
-      toast.error("Erreur lors du dépôt de l'ouvrage. Veuillez réessayer.");
+    } catch (err: any) {
+      toast.error(err?.message || "Erreur lors du dépôt de l'ouvrage. Veuillez réessayer.");
     } finally {
       setSubmitting(false);
     }
@@ -1274,7 +1274,7 @@ export default function NewPublisherBookPage() {
                   <span>Tous Droits Réservés &bull; Convention Partenaire LAHA</span>
                 </div>
                 <p className="text-[11px] text-foreground-muted leading-relaxed">
-                  L&apos;ouvrage déposé est automatiquement protégé par le système DRM LCP (Readium) conformément aux dispositions contractuelles de votre convention d&apos;édition.
+                  L&apos;ouvrage déposé est automatiquement protégé par le système DRM LCP (Readium).
                 </p>
               </div>
 

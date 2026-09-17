@@ -977,7 +977,7 @@ class MaquettisteDepositViewSet(viewsets.ModelViewSet):
             "message": f"L'ouvrage « {ouvrage.title} » a été soumis au Chef Maquettiste."
         })
 
-    @action(detail=False, methods=['post'], url_path='presigned-upload-url')
+    @action(detail=False, methods=['post'], url_path='presigned-upload-url', permission_classes=[permissions.IsAuthenticated])
     def get_presigned_upload_url(self, request):
         """
         POST /api/v1/catalog/my-deposits/presigned-upload-url/

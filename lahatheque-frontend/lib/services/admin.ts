@@ -1263,12 +1263,14 @@ export const triggerRoyaltyCalculation = triggerRoyaltyCalculationNow;
 export interface BouquetOfferingAdmin {
   id: string;
   title: string;
-  bouquet_type: "discipline" | "faculty" | "university" | "country" | "custom";
+  bouquet_type: "discipline" | "faculty" | "university" | "country" | "custom" | "general";
   discipline: string;
   faculty_code: string;
   target_institution: string | null;
+  target_institution_name?: string | null;
   country: string;
   books_count: number;
+  monthly_price: number;
   annual_price: number;
   currency: string;
   description: string;
@@ -1321,19 +1323,135 @@ export async function createBouquetOffering(data: Partial<BouquetOfferingAdmin>)
 }
 
 export async function updateBouquetOffering(id: string, data: Partial<BouquetOfferingAdmin>): Promise<boolean> {
-  const res = await fetch(`/api/bff/admin/bouquet-offerings/${id}/`, {
-    method: "PATCH", credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-  });
-  return res.ok;
+  try {
+    const res = await fetch(`/api/bff/admin/bouquet-offerings/${id}/`, {
+      method: "PATCH",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      console.error("[updateBouquetOffering] Erreur:", err);
+      return false;
+    }
+    const json = await res.json().catch(() => ({}));
+    return json.success !== false;
+  } catch (err) {
+    console.error("[updateBouquetOffering] Network error:", err);
+    return false;
+  }
 }
+
 
 export async function deleteBouquetOffering(id: string): Promise<boolean> {
   const res = await fetch(`/api/bff/admin/bouquet-offerings/${id}/`, {
     method: "DELETE", credentials: "include",
   });
   return res.ok;
+}
+
+export interface BouquetSubscriberItem {
+  id: string;
+  type: "institution" | "client";
+  subscriber_name: string;
+  subscriber_code: string;
+  subscriber_email: string;
+  subscription_period: "monthly" | "annual";
+  price_paid: number;
+  currency: string;
+  status: "active" | "expired" | "pending" | "cancelled";
+  start_date: string | null;
+  end_date: string | null;
+  created_at: string | null;
+}
+
+export interface BouquetSubscriptionsResponse {
+  bouquet_id: string;
+  bouquet_title: string;
+  total_subscribers: number;
+  active_subscribers: number;
+  subscriptions: BouquetSubscriberItem[];
+}
+
+export async function getBouquetSubscriptions(bouquetId: string): Promise<BouquetSubscriptionsResponse | null> {
+  try {
+    const res = await fetch(`/api/bff/admin/bouquet-offerings/${bouquetId}/subscriptions/`, {
+      credentials: "include",
+      cache: "no-store",
+    });
+    if (res.ok) {
+      const json = await res.json();
+      return json.data || null;
+    }
+  } catch (err) {
+    console.error("[getBouquetSubscriptions] Error:", err);
+  }
+  return null;
+}
+
+export interface InstitutionBookPreviewItem {
+  id: string;
+  title: string;
+  authors: string[];
+  isbn?: string;
+  cover_url?: string;
+  discipline: string;
+  format_type: string;
+  price_digital: number;
+  publication_year?: number | null;
+}
+
+export interface InstitutionBooksPreviewResponse {
+  institution_id: string;
+  institution_name: string;
+  institution_code: string;
+  books_count: number;
+  books: InstitutionBookPreviewItem[];
+}
+
+export async function getInstitutionBooksPreview(institutionId: string): Promise<InstitutionBooksPreviewResponse | null> {
+  try {
+    const res = await fetch(`/api/bff/partners/institutions/${institutionId}/books-preview/`, {
+      credentials: "include",
+      cache: "no-store",
+    });
+    if (res.ok) {
+      const json = await res.json();
+      return json.data || null;
+    }
+  } catch (err) {
+    console.error("[getInstitutionBooksPreview] Error:", err);
+  }
+  return null;
+}
+
+export interface BouquetOfferingBooksPreviewResponse {
+  id: string;
+  title: string;
+  bouquet_type: string;
+  discipline: string;
+  country: string;
+  target_institution?: string | null;
+  target_institution_name?: string | null;
+  books_count: number;
+  books: InstitutionBookPreviewItem[];
+}
+
+export async function getBouquetOfferingBooksPreview(bouquetId: string): Promise<BouquetOfferingBooksPreviewResponse | null> {
+  try {
+    const res = await fetch(`/api/bff/admin/bouquet-offerings/${bouquetId}/`, {
+      credentials: "include",
+      cache: "no-store",
+    });
+    if (res.ok) {
+      const json = await res.json();
+      return json.data || null;
+    }
+  } catch (err) {
+    console.error("[getBouquetOfferingBooksPreview] Error:", err);
+  }
+  return null;
 }
 
 // =========================================================================

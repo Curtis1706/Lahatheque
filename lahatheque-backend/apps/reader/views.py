@@ -5,7 +5,7 @@ Gère la création de sessions, la validation de token, les quiz, la progression
 
 from datetime import timedelta
 import logging
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, Union
 import uuid
 from django.conf import settings
 from django.db import transaction
@@ -85,6 +85,28 @@ class ReaderSessionViewSet(ViewSet):
         source_type = validated_data.get('source_type', 'catalog_book')
         ttl_seconds = validated_data.get('ttl_seconds', 14400)
         expires_at = timezone.now() + timedelta(seconds=ttl_seconds)
+
+        # Contrôle granulaire des bouquets partenaires et de leur validité (T020)
+        ouvrage = validated_data.get('validated_ouvrage')
+        if source_type == 'catalog_book' and ouvrage:
+            has_bouquet_restrictions = partner.restricted_bouquets.exists() or bool(partner.restricted_bouquet_id)
+            if has_bouquet_restrictions:
+                active_bouquets = partner.get_active_bouquets()
+                if not active_bouquets.exists():
+                    return standard_response(
+                        error="L'accès à la liseuse est suspendu car l'abonnement bouquet de votre établissement a expiré.",
+                        status_code=status.HTTP_403_FORBIDDEN
+                    )
+                institution = partner.linked_institution
+                allowed_books_ids = set()
+                for bq in active_bouquets:
+                    allowed_books_ids.update(bq.get_books_queryset(requesting_institution=institution).values_list('id', flat=True))
+
+                if ouvrage.id not in allowed_books_ids:
+                    return standard_response(
+                        error=f"L'ouvrage '{ouvrage.title}' n'appartient à aucun bouquet actif souscrit par votre établissement.",
+                        status_code=status.HTTP_403_FORBIDDEN
+                    )
 
         with transaction.atomic():
             # 1. Résolution ou création de l'utilisateur partenaire
@@ -236,7 +258,7 @@ class ReaderSessionViewSet(ViewSet):
             status_code=status.HTTP_201_CREATED
         )
 
-    def retrieve(self, request: Request, pk: str = None) -> Response:
+    def retrieve(self, request: Request, pk: Optional[str] = None) -> Response:
         """
         GET /api/v1/reader/sessions/<id>/
         Polling d'état et consultation de progression d'une session.
@@ -253,7 +275,7 @@ class ReaderSessionViewSet(ViewSet):
         serializer = ReaderSessionDetailSerializer(session)
         return standard_response(data=serializer.data)
 
-    def destroy(self, request: Request, pk: str = None) -> Response:
+    def destroy(self, request: Request, pk: Optional[str] = None) -> Response:
         """
         DELETE /api/v1/reader/sessions/<id>/
         Révocation immédiate d'une session de lecture.
@@ -303,7 +325,7 @@ class ReaderValidateTokenView(APIView):
         if not token_str:
             return standard_response(error="Token de session manquant", status_code=status.HTTP_400_BAD_REQUEST)
 
-        session = None
+        session: Any = None
         error_msg = None
 
         try:
@@ -364,20 +386,76 @@ class ReaderValidateTokenView(APIView):
             ip_address=ip_addr,
             user_agent=request.META.get('HTTP_USER_AGENT', ''),
             access_type='read_online',
-            derived_hash=session.token_hash[:16] if session.token_hash else "nohash"
+            derived_hash=str(session.token_hash or '')[:16] if session.token_hash else "nohash"
         )
 
-        # Mettre à jour l'IP réelle du lecteur si pas encore enregistrée
-        if not isinstance(session.metadata, dict):
-            session.metadata = {}
-        if not session.metadata.get('user_ip'):
-            session.metadata['user_ip'] = ip_addr
-            session.save(update_fields=['metadata'])
+        import hashlib
+        import secrets
 
-        # Si le statut était 'created', on le passe à 'opened'
-        if session.status == 'created':
+        # Contrôle anti-partage et verrouillage au premier navigateur (Device/Browser Binding)
+        session_meta = dict(session.metadata) if isinstance(session.metadata, dict) else {}
+        expected_device_hash = session_meta.get('device_binding_hash')
+
+        session_cookie_key = f"laha_reader_bind_{session.id}"
+        incoming_device_token = (
+            request.headers.get("X-Reader-Device-Token")
+            or request.COOKIES.get(session_cookie_key)
+            or request.COOKIES.get("laha_reader_bind")
+            or (request.data.get("device_binding_token") if hasattr(request, "data") and isinstance(request.data, dict) else None)
+            or request.query_params.get("device_token")
+        )
+        if incoming_device_token:
+            incoming_device_token = str(incoming_device_token).strip()
+
+        device_binding_token_for_response = None
+
+        if not expected_device_hash:
+            # Première activation légitime : on génère un secret unique et on verrouille la session à ce navigateur
+            new_device_token = secrets.token_urlsafe(32)
+            new_device_hash = hashlib.sha256(new_device_token.encode('utf-8')).hexdigest()
+            session_meta['device_binding_hash'] = new_device_hash
+            session_meta['bound_ip'] = ip_addr
+            session_meta['bound_user_agent'] = request.META.get('HTTP_USER_AGENT', '')[:500]
+            session_meta['first_opened_at'] = timezone.now().isoformat()
+            if not session_meta.get('user_ip'):
+                session_meta['user_ip'] = ip_addr
+            session.metadata = session_meta
             session.status = 'opened'
-            session.save(update_fields=['status', 'updated_at'])
+            session.save(update_fields=['status', 'metadata', 'updated_at'])
+            device_binding_token_for_response = new_device_token
+        else:
+            # Session déjà activée sur un navigateur : vérification stricte de non-partage
+            is_valid_device = False
+            if incoming_device_token:
+                incoming_hash = hashlib.sha256(incoming_device_token.encode('utf-8')).hexdigest()
+                if incoming_hash == expected_device_hash:
+                    is_valid_device = True
+
+            if not is_valid_device:
+                logger.warning(
+                    f"[AntiSharing] Tentative de partage refusée pour la session {session.id}. "
+                    f"Session verrouillée sur un autre navigateur. IP appelante: {ip_addr}, IP liée: {session_meta.get('bound_ip')}"
+                )
+                try:
+                    TraceAcces.objects.create(
+                        ouvrage=session.ouvrage,
+                        partner_id=str(session.partner_id) if hasattr(session, 'partner_id') and session.partner_id else str(session.partner.id),
+                        document_title=doc_title,
+                        ip_address=ip_addr,
+                        user_agent=request.META.get('HTTP_USER_AGENT', '')[:500],
+                        access_type='unauthorized_sharing_attempt',
+                        derived_hash=str(session.token_hash or '')[:16] if session.token_hash else "nohash"
+                    )
+                except Exception as log_err:
+                    logger.warning(f"Erreur journalisation TraceAcces partage: {log_err}")
+
+                return standard_response(
+                    error="Cette session de lecture est déjà verrouillée sur un autre navigateur. Pour des raisons de sécurité et de droits d'auteur, le partage de session est interdit.",
+                    status_code=status.HTTP_403_FORBIDDEN
+                )
+
+            # C'est le même navigateur qui recharge : on maintient son jeton actif
+            device_binding_token_for_response = incoming_device_token
 
         doc_cover = getattr(session.ouvrage, 'couverture', None) or getattr(session.ouvrage, 'cover_image', None)
         doc_cover_url = doc_cover.url if (doc_cover and hasattr(doc_cover, 'url')) else None
@@ -441,7 +519,28 @@ class ReaderValidateTokenView(APIView):
             }
         }
 
-        return standard_response(data=response_data)
+        if device_binding_token_for_response:
+            response_data["device_binding_token"] = device_binding_token_for_response
+
+        response = standard_response(data=response_data)
+        if device_binding_token_for_response:
+            response.set_cookie(
+                session_cookie_key,
+                device_binding_token_for_response,
+                max_age=86400,
+                httponly=True,
+                samesite='Lax',
+                secure=request.is_secure()
+            )
+            response.set_cookie(
+                "laha_reader_bind",
+                device_binding_token_for_response,
+                max_age=86400,
+                httponly=True,
+                samesite='Lax',
+                secure=request.is_secure()
+            )
+        return response
 
 
 class ReaderProgressView(APIView):
@@ -453,7 +552,7 @@ class ReaderProgressView(APIView):
     permission_classes = [IsValidReaderSession]
 
     def post(self, request: Request) -> Response:
-        session: ReaderSession = request.reader_session
+        session: Any = getattr(request, 'reader_session', None)
         serializer = ProgressSyncSerializer(data=request.data)
         if not serializer.is_valid():
             return standard_response(error=serializer.errors, status_code=status.HTTP_400_BAD_REQUEST)
@@ -504,7 +603,7 @@ class ReaderQuizSubmitView(APIView):
     permission_classes = [IsValidReaderSession]
 
     def post(self, request: Request) -> Response:
-        session: ReaderSession = request.reader_session
+        session: Any = getattr(request, 'reader_session', None)
         serializer = QuizSubmitSerializer(data=request.data)
         if not serializer.is_valid():
             return standard_response(error=serializer.errors, status_code=status.HTTP_400_BAD_REQUEST)
@@ -758,17 +857,38 @@ class ReaderProtectedStreamView(APIView):
 
     DEFAULT_CHUNK_SIZE = 256 * 1024
 
-    def get(self, request: Request) -> Response:
+    def get(self, request: Request) -> Union[Response, HttpResponse]:
         from apps.protection.derived_materializer import DerivedMaterializer
         from apps.protection.models import ProtectionConfig, TraceAcces, GlobalDrmConfig
 
-        session: ReaderSession = request.reader_session
+        session: Any = getattr(request, 'reader_session', None)
 
         if not session.is_valid:
             return standard_response(
                 error="Session de lecture expirée ou révoquée.",
                 status_code=status.HTTP_403_FORBIDDEN
             )
+
+        # Contrôle anti-partage : vérification de la liaison au terminal/navigateur légitime
+        if isinstance(session.metadata, dict) and session.metadata.get("device_binding_hash"):
+            import hashlib
+            expected_hash = session.metadata["device_binding_hash"]
+            session_cookie_key = f"laha_reader_bind_{session.id}"
+            incoming_device_token = (
+                request.headers.get("X-Reader-Device-Token")
+                or request.COOKIES.get(session_cookie_key)
+                or request.COOKIES.get("laha_reader_bind")
+                or (request.data.get("device_binding_token") if hasattr(request, "data") and isinstance(request.data, dict) else None)
+                or request.query_params.get("device_token")
+            )
+            if not incoming_device_token or hashlib.sha256(str(incoming_device_token).strip().encode("utf-8")).hexdigest() != expected_hash:
+                logger.warning(
+                    f"[AntiSharing] Flux refusé pour session {session.id} : jeton de terminal absent ou non concordant."
+                )
+                return standard_response(
+                    error="Accès au flux refusé : cette session de lecture est verrouillée sur un autre navigateur.",
+                    status_code=status.HTTP_403_FORBIDDEN
+                )
 
         # Vérification de sécurité : Liste noire des lecteurs bloqués (BlockedReaderIdentity)
         from apps.protection.models import BlockedReaderIdentity
@@ -875,7 +995,7 @@ class ReaderProtectedStreamView(APIView):
 
         if is_range_request:
             start_byte, end_byte = self._parse_range_header(range_header, total_size)
-            if start_byte is None:
+            if start_byte is None or end_byte is None:
                 response = HttpResponse(status=status.HTTP_416_REQUESTED_RANGE_NOT_SATISFIABLE)
                 response["Content-Range"] = f"bytes */{total_size}"
                 return response
@@ -960,13 +1080,19 @@ class PartnerCatalogListView(APIView):
         from apps.student.serializers import OuvrageBasicSerializer
 
         partner = getattr(request, 'partner', None)
-        restricted_bouquet = getattr(partner, 'restricted_bouquet', None) if partner else None
         partner_id = str(partner.id) if partner else "anon"
-        bouquet_id = str(restricted_bouquet.id) if restricted_bouquet else "all"
 
-        # 1. Clé de cache déterministe contextuelle au partenaire et aux filtres
+        has_bouquet_restrictions = False
+        if partner:
+            has_bouquet_restrictions = partner.restricted_bouquets.exists() or bool(partner.restricted_bouquet_id)
+
+        active_bouquets = partner.get_active_bouquets() if partner else None
+        active_ids = list(active_bouquets.values_list('id', flat=True)) if active_bouquets else []
+        active_ids_str = "-".join(sorted(str(i) for i in active_ids))
+
+        # 1. Clé de cache déterministe contextuelle au partenaire et aux bouquets actifs
         query_items = sorted(request.query_params.items())
-        cache_raw = f"partner_catalog:{partner_id}:{bouquet_id}:{query_items}"
+        cache_raw = f"partner_catalog:{partner_id}:{active_ids_str}:{query_items}"
         cache_key = "partner:cat:" + hashlib.md5(cache_raw.encode("utf-8")).hexdigest()
 
         cached_response = cache.get(cache_key)
@@ -974,9 +1100,20 @@ class PartnerCatalogListView(APIView):
             return Response(cached_response)
 
         # 2. Construction du QuerySet avec préchargement complet anti-N+1
-        if restricted_bouquet:
+        if has_bouquet_restrictions:
+            if not active_bouquets or not active_bouquets.exists():
+                return Response({
+                    "success": False,
+                    "error": "L'abonnement bouquet de votre établissement a expiré. Veuillez renouveler votre formule pour accéder au catalogue.",
+                    "data": []
+                }, status=status.HTTP_403_FORBIDDEN)
+
             institution = getattr(partner, 'linked_institution', None)
-            qs = restricted_bouquet.get_books_queryset(requesting_institution=institution).select_related(
+            allowed_book_ids = set()
+            for bq in active_bouquets:
+                allowed_book_ids.update(bq.get_books_queryset(requesting_institution=institution).values_list('id', flat=True))
+
+            qs = Ouvrage.objects.filter(id__in=allowed_book_ids, status='published').select_related(
                 'discipline', 'institution'
             ).prefetch_related('authors', 'language_versions', 'audio_tracks')
         else:
@@ -1078,7 +1215,6 @@ class PartnerCatalogDetailView(APIView):
         from apps.student.serializers import OuvrageBasicSerializer
 
         partner = getattr(request, 'partner', None)
-        restricted_bouquet = getattr(partner, 'restricted_bouquet', None) if partner else None
 
         try:
             ouvrage = Ouvrage.objects.select_related(
@@ -1087,11 +1223,24 @@ class PartnerCatalogDetailView(APIView):
         except (Ouvrage.DoesNotExist, Exception):
             return Response({"success": False, "error": "Ouvrage introuvable."}, status=404)
 
-        if restricted_bouquet:
+        if partner and (partner.restricted_bouquets.exists() or bool(partner.restricted_bouquet_id)):
+            active_bouquets = partner.get_active_bouquets()
+            if not active_bouquets.exists():
+                return Response({
+                    "success": False,
+                    "error": "L'accès à cet ouvrage est refusé car l'abonnement bouquet de votre établissement a expiré."
+                }, status=status.HTTP_403_FORBIDDEN)
+
             institution = getattr(partner, 'linked_institution', None)
-            allowed_ids = restricted_bouquet.get_books_queryset(requesting_institution=institution).values_list('id', flat=True)
+            allowed_ids = set()
+            for bq in active_bouquets:
+                allowed_ids.update(bq.get_books_queryset(requesting_institution=institution).values_list('id', flat=True))
+
             if ouvrage.id not in allowed_ids:
-                return Response({"success": False, "error": "Cet ouvrage n'appartient pas au bouquet autorisé pour cette clé."}, status=403)
+                return Response({
+                    "success": False,
+                    "error": "Cet ouvrage n'appartient à aucun bouquet actif souscrit par votre établissement."
+                }, status=status.HTTP_403_FORBIDDEN)
 
         serializer = OuvrageBasicSerializer(
             ouvrage,

@@ -149,15 +149,14 @@ export function computeBouquetDistribution(params: {
       let usage_share_percent: number;
       if (total_consultations > 0) {
         usage_share_percent = Number(((g.consultations_count / total_consultations) * 100).toFixed(2));
-      } else if (total_books > 0) {
-        usage_share_percent = Number(((g.books_count / total_books) * 100).toFixed(2));
       } else {
+        // ZÉRO MOCK, ZÉRO SIMULATION : aucune consultation enregistrée
         usage_share_percent = 0;
       }
 
-      if (idx === groupList.length - 1 && groupList.length > 1) {
+      if (total_consultations > 0 && idx === groupList.length - 1 && groupList.length > 1) {
         usage_share_percent = Number(Math.max(0, 100 - accumulated_pct).toFixed(2));
-      } else {
+      } else if (total_consultations > 0) {
         accumulated_pct += usage_share_percent;
       }
 
@@ -188,7 +187,8 @@ export function computeBouquetDistribution(params: {
     ? Math.round(items.reduce((acc, it) => acc + (it.royalty_amount || 0), 0))
     : Number(items.reduce((acc, it) => acc + (it.royalty_amount || 0), 0).toFixed(2));
 
-  const platform_revenue = Math.max(0, total_ca - total_royalties);
+  const real_royalties = total_consultations > 0 ? total_royalties : 0;
+  const platform_revenue = total_consultations > 0 ? Math.max(0, total_ca - real_royalties) : 0;
 
   return {
     bouquet_id,
@@ -201,15 +201,15 @@ export function computeBouquetDistribution(params: {
     distribution: items,
     totals: {
       total_books,
-      total_usage_percentage: 100,
+      total_usage_percentage: total_consultations > 0 ? 100 : 0,
       total_ca,
-      total_royalties,
+      total_royalties: real_royalties,
       platform_revenue,
     },
     total_books,
     total_ca,
     royalty_rate,
-    total_royalties,
+    total_royalties: real_royalties,
     items,
   };
 }

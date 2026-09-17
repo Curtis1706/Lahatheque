@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   DollarSign,
@@ -43,6 +44,7 @@ type TabType = "unit_sales" | "bouquets";
 
 export default function UniversityRoyaltiesPage() {
   const { user } = useAuth();
+  const router = useRouter();
   const [data, setData] = useState<UniversityRoyaltiesDetailData | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabType>("unit_sales");
@@ -52,7 +54,21 @@ export default function UniversityRoyaltiesPage() {
   const [formatFilter, setFormatFilter] = useState<"all" | "paper" | "digital" | "audio">("all");
   const [buyerFilter, setBuyerFilter] = useState<string>("all");
 
+  const isClient =
+    (user as any)?.institution_detail?.institution_type === "client" ||
+    (user as any)?.university_profile?.institution_type === "client" ||
+    (user as any)?.institution_type === "client";
+
+  // Redirection de sécurité stricte — les universités clientes n'ont jamais accès aux redevances
   useEffect(() => {
+    if (isClient) {
+      console.info("[UNIV ACCESS GUARD]", new Date().toISOString(), "- Client redirected from /royalties to /university");
+      router.replace("/university");
+    }
+  }, [isClient, router]);
+
+  useEffect(() => {
+    if (isClient) return;
     async function loadData() {
       setLoading(true);
       const res = await getUniversityRoyalties();
@@ -60,7 +76,7 @@ export default function UniversityRoyaltiesPage() {
       setLoading(false);
     }
     loadData();
-  }, []);
+  }, [isClient]);
 
   const handleWithdraw = async (amount: number) => {
     const ok = await requestUniversityRoyaltyWithdrawal(amount);
@@ -380,6 +396,10 @@ export default function UniversityRoyaltiesPage() {
       },
     },
   ];
+
+  if (isClient) {
+    return null;
+  }
 
   if (loading || !data) {
     return (

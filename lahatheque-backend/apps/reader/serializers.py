@@ -116,6 +116,14 @@ class ReaderSessionCreateSerializer(serializers.Serializer):
     permissions = PermissionsConfigSerializer(required=False, default=dict)
     metadata = serializers.DictField(required=False, default=dict)
 
+    def to_internal_value(self, data: Any) -> Dict[str, Any]:
+        data_copy = data.copy() if hasattr(data, 'copy') else dict(data)
+        if 'external_user_id' in data_copy and 'external_user_ref' not in data_copy:
+            data_copy['external_user_ref'] = data_copy['external_user_id']
+        if 'ouvrage_id' in data_copy and 'book_id' not in data_copy:
+            data_copy['book_id'] = data_copy['ouvrage_id']
+        return super().to_internal_value(data_copy)
+
     def validate(self, attrs: Dict[str, Any]) -> Dict[str, Any]:
         source_type = attrs.get('source_type', 'catalog_book')
 

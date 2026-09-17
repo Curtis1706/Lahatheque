@@ -525,7 +525,11 @@ def handle_payment_failure(payment_tx):
 
 def handle_bouquet_payment_success(payment_tx):
     """Active une souscription bouquet après confirmation de paiement Moneroo."""
-    from apps.partners.models import UniversityBouquetSubscription
+    import secrets
+    from django.core.cache import cache
+    from apps.partners.models import UniversityBouquetSubscription, BouquetOffering
+    from apps.reader.models import PartnerApp
+    from apps.reader.auth_utils import generate_client_id, generate_client_secret, hash_secret
 
     subs = UniversityBouquetSubscription.objects.filter(
         payment_transaction=payment_tx, status='pending'
@@ -534,6 +538,78 @@ def handle_bouquet_payment_success(payment_tx):
         sub.status = 'active'
         sub.save(update_fields=['status'])
         logger.info(f"[Commerce] Bouquet {sub.id} activé pour {sub.institution.name} après paiement.")
+
+        offering = BouquetOffering.objects.filter(id=sub.offering_id).first() if sub.offering_id else None
+
+        # Recherche ou création de l'application partenaire unique pour cette institution (Décision Q1)
+        partner = PartnerApp.objects.filter(linked_institution=sub.institution).first()
+        is_new = False
+        raw_secret = None
+
+        if not partner:
+            is_new = True
+            client_id = generate_client_id()
+            raw_secret = generate_client_secret()
+            secret_hash = hash_secret(raw_secret)
+            last4 = raw_secret[-4:]
+            wh_secret = secrets.token_hex(32)
+
+            partner = PartnerApp.objects.create(
+                name=f"LMS {sub.institution.name}",
+                linked_institution=sub.institution,
+                client_id=client_id,
+                client_secret_hash=secret_hash,
+                client_secret_last4=last4,
+                webhook_secret=wh_secret,
+                access_mode='catalog_only',
+                quotas={'is_unlimited': True},
+                is_active=True,
+            )
+            logger.info(f"[Commerce] Nouvelle PartnerApp créée pour {sub.institution.name}: client_id={client_id}")
+        else:
+            partner.is_active = True
+            partner.access_mode = 'catalog_only'
+            if not partner.quotas:
+                partner.quotas = {'is_unlimited': True}
+            partner.save(update_fields=['is_active', 'access_mode', 'quotas'])
+            logger.info(f"[Commerce] PartnerApp existante réutilisée pour {sub.institution.name}: client_id={partner.client_id}")
+
+        # Rattachement cumulatif du bouquet
+        if offering:
+            partner.restricted_bouquets.add(offering)
+
+        # Stockage temporaire sécurisé en cache (TTL 15 minutes = 900s)
+        cache_key = f"post_payment_credentials_{sub.id}"
+        env_content = (
+            f"# LAHAThèque API Credentials - {sub.institution.name}\n"
+            f"LAHATHEQUE_CLIENT_ID={partner.client_id}\n"
+            f"LAHATHEQUE_CLIENT_SECRET={raw_secret if is_new else '<VOTRE_SECRET_EXISTANT>'}\n"
+            f"LAHATHEQUE_API_URL=https://api.lahatheque.com/api/v1\n"
+        )
+        cache.set(cache_key, {
+            "client_id": partner.client_id,
+            "client_secret": raw_secret,
+            "client_secret_last4": partner.client_secret_last4,
+            "institution_name": sub.institution.name,
+            "subscription_id": str(sub.id),
+            "offering_title": sub.title,
+            "period": getattr(sub, 'subscription_period', 'annual'),
+            "end_date": sub.end_date.strftime("%d/%m/%Y") if sub.end_date else None,
+            "created": is_new,
+            "env_content": env_content,
+        }, timeout=900)
+
+        # Envoi d'emails transactionnels (T022) si implémenté
+        try:
+            from apps.reporting.tasks import send_bouquet_subscription_emails
+            send_bouquet_subscription_emails(str(sub.id))
+        except Exception as mail_err:
+            logger.warning(f"[Commerce] Notification email bouquet différée ou non configurée: {mail_err}")
+
+        # Enregistrement comptable et validation transaction (T024)
+        if payment_tx and payment_tx.status != 'success':
+            payment_tx.status = 'success'
+            payment_tx.save(update_fields=['status'])
 
     # Souscriptions client
     from apps.commerce.models import ClientBouquetSubscription
@@ -544,4 +620,11 @@ def handle_bouquet_payment_success(payment_tx):
         csub.status = 'active'
         csub.save(update_fields=['status'])
         logger.info(f"[Commerce] Bouquet client {csub.id} activé après paiement.")
+        try:
+            from apps.reporting.tasks import send_bouquet_subscription_emails
+            send_bouquet_subscription_emails(str(csub.id))
+        except Exception as mail_err:
+            logger.warning(f"[Commerce] Notification email bouquet client différée: {mail_err}")
+
+
 

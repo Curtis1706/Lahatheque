@@ -1,0 +1,76 @@
+{% extends "emails/base_email.html" %}
+
+{% block title %}Alerte Souscription Bouquet • {{ bouquet_title }} • LAHAThèque{% endblock %}
+{% block badge_header %}Notification Administration • Revenu Encaissé{% endblock %}
+
+{% block email_title %}Nouvelle Souscription Bouquet Universitaire{% endblock %}
+
+{% block email_content %}
+<p style="margin: 0 0 16px 0; font-size: 15px;">
+    Notification automatique pour la <strong>Direction et l'Administration LAHA</strong>,
+</p>
+<p style="margin: 0 0 20px 0; line-height: 1.65;">
+    Un nouveau règlement d'abonnement bouquet vient d'être validé avec succès sur la plateforme.
+</p>
+
+<!-- Récapitulatif Admin -->
+<div class="box-soft" style="background-color: #F8FAFC; border-radius: 6px; padding: 20px; margin-bottom: 24px; border: 0;">
+    <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: #B08D42; letter-spacing: 0.8px; margin-bottom: 14px;">
+        Synthèse Financière &amp; Contractuelle
+    </div>
+    <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+        <tr>
+            <td align="left" style="padding: 7px 0; border-bottom: 1px solid #F1F5F9; font-size: 13px;" class="text-dark-adapt divider-soft">
+                Établissement / Université
+            </td>
+            <td align="right" style="padding: 7px 0; border-bottom: 1px solid #F1F5F9; font-size: 13px; font-weight: 600; color: #1B2A4E;" class="text-dark-adapt divider-soft">
+                {{ institution_name }}
+            </td>
+        </tr>
+        <tr>
+            <td align="left" style="padding: 7px 0; border-bottom: 1px solid #F1F5F9; font-size: 13px;" class="text-dark-adapt divider-soft">
+                Bouquet Souscrit
+            </td>
+            <td align="right" style="padding: 7px 0; border-bottom: 1px solid #F1F5F9; font-size: 13px; font-weight: 600; color: #1B2A4E;" class="text-dark-adapt divider-soft">
+                {{ bouquet_title }}
+            </td>
+        </tr>
+        <tr>
+            <td align="left" style="padding: 7px 0; border-bottom: 1px solid #F1F5F9; font-size: 13px;" class="text-dark-adapt divider-soft">
+                Formule
+            </td>
+            <td align="right" style="padding: 7px 0; border-bottom: 1px solid #F1F5F9; font-size: 13px; font-weight: 600; color: #1B2A4E;" class="text-dark-adapt divider-soft">
+                {{ period_label }}
+            </td>
+        </tr>
+        <tr>
+            <td align="left" style="padding: 7px 0; border-bottom: 1px solid #F1F5F9; font-size: 13px;" class="text-dark-adapt divider-soft">
+                Échéance de fin de droits
+            </td>
+            <td align="right" style="padding: 7px 0; border-bottom: 1px solid #F1F5F9; font-size: 13px; font-weight: 600; color: #B08D42;" class="text-dark-adapt divider-soft">
+                {{ end_date }}
+            </td>
+        </tr>
+        <tr>
+            <td align="left" style="padding: 7px 0; border-bottom: 1px solid #F1F5F9; font-size: 13px;" class="text-dark-adapt divider-soft">
+                Réf. Transaction Moneroo
+            </td>
+            <td align="right" style="padding: 7px 0; border-bottom: 1px solid #F1F5F9; font-size: 13px; font-family: monospace; color: #1B2A4E;" class="text-dark-adapt divider-soft">
+                {{ payment_ref }}
+            </td>
+        </tr>
+        <tr>
+            <td align="left" style="padding-top: 14px; font-size: 14px; font-weight: 600;" class="text-dark-adapt">
+                Montant Encaissé :
+            </td>
+            <td align="right" style="padding-top: 14px; font-size: 16px; font-weight: 700; color: #B08D42;">
+                {{ amount }}
+            </td>
+        </tr>
+    </table>
+</div>
+
+<p style="font-size: 12px; color: #64748B; margin: 0 0 24px 0; line-height: 1.5;" class="text-muted-adapt">
+    La facture acquittée N° {{ invoice_number }} a été générée et envoyée au partenaire. L'application partenaire Machine-to-Machine a été provisionnée ou mise à jour automatiquement.
+</p>
+{% endblock %}

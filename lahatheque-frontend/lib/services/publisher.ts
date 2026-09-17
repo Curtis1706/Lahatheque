@@ -15,6 +15,8 @@ import type {
   ProtectionConfig as PublisherBookProtection,
 } from "../types/publisher";
 
+import { uploadFileDirectlyToR2 } from "./storage";
+
 const BFF = "/api/bff/publishers";
 
 // ─── Helpers BFF ─────────────────────────────────────────────────────────────
@@ -121,6 +123,43 @@ export async function createPublisherBook(
   file?: File | null,
   coverFile?: File | null
 ): Promise<PublisherBook> {
+  let fileKey: string | undefined = undefined;
+  let coverKey: string | undefined = undefined;
+
+  // 1. Téléversement direct ultra-rapide vers Cloudflare R2 (identique au maquettiste)
+  if (file) {
+    try {
+      const uploadRes = await uploadFileDirectlyToR2(file, "book");
+      if (uploadRes.directToR2 && uploadRes.fileKey) {
+        fileKey = uploadRes.fileKey;
+      }
+    } catch (r2Err) {
+      console.warn("[Publisher Service] R2 direct indisponible pour le manuscrit:", r2Err);
+    }
+  }
+
+  if (coverFile) {
+    try {
+      const coverRes = await uploadFileDirectlyToR2(coverFile, "cover");
+      if (coverRes.directToR2 && coverRes.fileKey) {
+        coverKey = coverRes.fileKey;
+      }
+    } catch (covErr) {
+      console.warn("[Publisher Service] R2 direct indisponible pour la couverture:", covErr);
+    }
+  }
+
+  // 2. Si les fichiers ont été envoyés sur R2 en direct, envoyer un simple JSON pur !
+  if (fileKey) {
+    const payload = {
+      ...data,
+      file_key: fileKey,
+      cover_key: coverKey || "",
+    };
+    return bffPost<PublisherBook>("/deposits/", payload);
+  }
+
+  // 3. Fallback multipart standard si R2 non disponible
   if (file || coverFile) {
     const formData = new FormData();
     if (file) formData.append("file", file, file.name);

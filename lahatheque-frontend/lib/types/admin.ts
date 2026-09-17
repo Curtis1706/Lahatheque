@@ -23,15 +23,15 @@ export const ADMIN_ROLE_LABELS: Record<string, string> = {
   parent: "Parent d'élève",
   author: "Auteur",
   publisher: "Éditeur Tiers",
-  university: "Université / Établissement",
+  university: "Université",
   layout_artist: "Maquettiste",
   chief_layout: "Chef Maquettiste",
   manager: "Gestionnaire Stock & Livraison",
   coordination_manager: "Gestionnaire Coordination",
   legal_reviewer: "Juriste / Relecteur",
-  wholesaler: "Grossiste Commercial",
-  super_client: "Grossiste Commercial",
-  commercial_wholesaler: "Grossiste Commercial",
+  wholesaler: "Grossiste",
+  super_client: "Grossiste",
+  commercial_wholesaler: "Grossiste",
   partner_api: "Partenaire API",
   admin: "Administrateur",
   super_admin: "Super Administrateur",
@@ -106,6 +106,7 @@ export interface AdminUser {
     short_name?: string;
     royalty_rate?: number;
     country?: string;
+    institution_type?: "partner" | "client";
   } | null;
   custom_remise_papier_pct?: number | null;
   custom_remise_numerique_pct?: number | null;
@@ -125,6 +126,8 @@ export interface CreateAdminUserPayload {
   institution_name?: string;
   institution_code?: string;
   institution_country?: string;
+  institution_type?: "partner" | "client";
+  institution_royalty_rate?: number;
   temporary_password?: string;
 }
 
@@ -139,6 +142,9 @@ export interface UpdateAdminUserPayload {
   institution_name?: string;
   institution_code?: string;
   institution_country?: string;
+  institution_type?: "partner" | "client";
+  institution_royalty_rate?: number;
+  royalty_rate_override?: number;
 }
 
 export interface AuthorUserDiscounts {
@@ -403,6 +409,9 @@ export interface PartnerApiKey {
   // Restriction Bouquet
   restricted_bouquet_id?: string | null;
   restrictedBouquetName?: string | null;
+  restricted_bouquets?: { id: string; title: string; end_date?: string; status?: string }[];
+  restrictedBouquetsSummary?: string;
+  institutionExpirationDate?: string | null;
 }
 
 export interface AdminValidationProof {

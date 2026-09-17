@@ -43,6 +43,97 @@ class InstitutionViewSet(viewsets.ModelViewSet):
     serializer_class = InstitutionSerializer
     permission_classes = [permissions.IsAuthenticated, IsAdminOrSuperAdmin]
 
+    # T018 : Codes des 4 partenaires historiques dont institution_type est inviolable
+    LOCKED_PARTNER_CODES = frozenset({'UAC', 'UP', 'UNSTIM', 'UNA'})
+
+    def _check_integrity_lock(self, instance: 'Institution', new_institution_type: 'str | None') -> None:
+        """
+        T018 : Lève une PermissionDenied si on tente de passer institution_type
+        d'une des 4 institutions historiques vers autre chose que 'partner'.
+        """
+        from rest_framework.exceptions import PermissionDenied
+        import datetime
+        if instance.code and instance.code.upper() in self.LOCKED_PARTNER_CODES:
+            if new_institution_type is not None and new_institution_type != 'partner':
+                logger.warning(
+                    "[ADMIN INSTITUTION] %s T018 INTEGRITY LOCK — Tentative de reclassement de '%s' en '%s' bloquée par la garde backend.",
+                    datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                    instance.code,
+                    new_institution_type,
+                )
+                raise PermissionDenied(
+                    detail=(
+                        f"L'institution '{instance.code}' fait partie des 4 universités partenaires fondatrices "
+                        "(UAC, UP, UNSTIM, UNA). Son statut est verrouillé et ne peut pas être modifié "
+                        "(T018 Integrity Lock). Contactez l'équipe technique si une correction exceptionnelle est nécessaire."
+                    )
+                )
+
+    def update(self, request, *args, **kwargs):
+        """T018 : Surcharge PUT — applique le verrou d'intégrité avant toute modification."""
+        instance = self.get_object()
+        self._check_integrity_lock(instance, request.data.get('institution_type'))
+        return super().update(request, *args, **kwargs)
+
+    def partial_update(self, request, *args, **kwargs):
+        """T018 : Surcharge PATCH — applique le verrou d'intégrité avant toute modification partielle."""
+        instance = self.get_object()
+        self._check_integrity_lock(instance, request.data.get('institution_type'))
+        return super().partial_update(request, *args, **kwargs)
+
+    @action(detail=True, methods=['get'], url_path='books-preview')
+    def books_preview(self, request, pk=None):
+        """
+        GET /api/v1/partners/institutions/<uuid:pk>/books-preview/
+        Retourne le décompte et la liste détaillée des livres publiés avec couvertures, titres,
+        disciplines et auteurs pour inspection visuelle dans la modale d'administration de bouquet.
+        """
+        from apps.catalog.models import Ouvrage
+        from django.db.models import Q
+        institution = self.get_object()
+        books_qs = Ouvrage.objects.filter(
+            institution=institution,
+            status='published'
+        ).select_related('discipline').prefetch_related('authors').order_by('title')
+
+        books_list = []
+        for book in books_qs:
+            cover_url = ""
+            if book.cover_image:
+                try:
+                    cover_url = book.cover_image.url
+                except Exception:
+                    cover_url = str(book.cover_image)
+            elif hasattr(book, 'cover_url') and book.cover_url:
+                cover_url = book.cover_url
+
+            authors = [
+                a.user.get_full_name() if (a.user and a.user.get_full_name()) else f"{a.first_name} {a.last_name}".strip()
+                for a in book.authors.all()
+            ] if hasattr(book, 'authors') else []
+            if not authors and book.auteur:
+                authors = [book.auteur]
+
+            books_list.append({
+                "id": str(book.id),
+                "title": book.title,
+                "authors": authors,
+                "isbn": book.isbn or "",
+                "cover_url": cover_url,
+                "discipline": book.discipline.name if book.discipline else "",
+                "format_type": getattr(book, 'format_type', 'pdf'),
+                "price_digital": float(book.price_digital or 0),
+                "publication_year": getattr(book, 'publication_year', None),
+            })
+
+        return standard_response({
+            "institution_id": str(institution.id),
+            "institution_name": institution.name,
+            "institution_code": institution.code,
+            "books_count": len(books_list),
+            "books": books_list,
+        })
+
 
 class StudentAffiliationViewSet(viewsets.ModelViewSet):
     queryset = StudentAffiliation.objects.all().order_by('-created_at')
@@ -244,7 +335,12 @@ class PartnerAppAdminViewSet(viewsets.ViewSet):
     def list(self, request: Request) -> Response:
         """GET /api/v1/partners/apps/ - Liste toutes les applications partenaires."""
         try:
-            apps = PartnerApp.objects.all().select_related("restricted_bouquet").order_by("-created_at")
+            apps = PartnerApp.objects.all().select_related(
+                "restricted_bouquet", "linked_institution"
+            ).prefetch_related(
+                "restricted_bouquets",
+                "linked_institution__bouquet_subscriptions"
+            ).order_by("-created_at")
             results: List[Dict[str, Any]] = []
 
             for app in apps:
@@ -305,10 +401,35 @@ class PartnerAppAdminViewSet(viewsets.ViewSet):
                 if access_mode in ["mixed", "catalog_only"]:
                     scopes.append("catalog:read")
 
+                # Bouquets restreints (Multi-bouquets)
+                bouquets_list = [
+                    {"id": str(b.id), "title": b.title}
+                    for b in app.restricted_bouquets.all()
+                ]
+                if not bouquets_list and app.restricted_bouquet:
+                    bouquets_list.append({
+                        "id": str(app.restricted_bouquet.id),
+                        "title": app.restricted_bouquet.title,
+                    })
+
+                bouquets_summary = ", ".join([b["title"] for b in bouquets_list]) if bouquets_list else None
+
+                # Échéance d'abonnement de l'établissement
+                institution_expiry = None
+                if app.linked_institution:
+                    latest_active_sub = app.linked_institution.bouquet_subscriptions.filter(
+                        status="active"
+                    ).order_by("-end_date").first()
+                    if latest_active_sub:
+                        institution_expiry = latest_active_sub.end_date.strftime("%Y-%m-%d")
+
                 results.append({
                     "id": str(app.id),
                     "name": app.name,
-                    "partner": app.name,
+                    "partner": app.linked_institution.name if app.linked_institution else app.name,
+                    "institutionName": app.linked_institution.name if app.linked_institution else app.name,
+                    "institution_name": app.linked_institution.name if app.linked_institution else app.name,
+                    "institutionExpirationDate": institution_expiry,
                     "clientId": client_id,
                     "clientSecret": client_secret_masked,
                     "hasSecret": bool(app.client_secret_hash),
@@ -327,7 +448,9 @@ class PartnerAppAdminViewSet(viewsets.ViewSet):
                     "allowedDocumentSources": quotas.get("allowed_document_sources", []),
                     "maxFileSizeMb": quotas.get("max_file_size_mb", 200),
                     "restricted_bouquet_id": str(app.restricted_bouquet_id) if app.restricted_bouquet_id else None,
-                    "restrictedBouquetName": app.restricted_bouquet.title if app.restricted_bouquet else None,
+                    "restrictedBouquetName": bouquets_summary or (app.restricted_bouquet.title if app.restricted_bouquet else None),
+                    "restricted_bouquets": bouquets_list,
+                    "restrictedBouquetsSummary": bouquets_summary,
                 })
 
             return standard_response(data=results)
@@ -404,6 +527,22 @@ class PartnerAppAdminViewSet(viewsets.ViewSet):
 
             client_id = client_id_gen
 
+            restricted_bouquet_ids = (
+                data.get("restricted_bouquets_ids") or
+                data.get("restrictedBouquetIds") or
+                data.get("restricted_bouquet_ids")
+            )
+            if restricted_bouquet_ids and isinstance(restricted_bouquet_ids, list):
+                from apps.partners.models import BouquetOffering
+                valid_bouquets = list(BouquetOffering.objects.filter(id__in=restricted_bouquet_ids))
+                app.restricted_bouquets.set(valid_bouquets)
+                if not restricted_bouquet and valid_bouquets:
+                    app.restricted_bouquet = valid_bouquets[0]
+                    app.save(update_fields=["restricted_bouquet"])
+
+            b_list = [{"id": str(b.id), "title": b.title} for b in app.restricted_bouquets.all()]
+            b_summary = ", ".join([b["title"] for b in b_list]) if b_list else None
+
             result = {
                 "id": str(app.id),
                 "name": app.name,
@@ -426,7 +565,9 @@ class PartnerAppAdminViewSet(viewsets.ViewSet):
                 "allowedDocumentSources": quotas["allowed_document_sources"],
                 "maxFileSizeMb": quotas["max_file_size_mb"],
                 "restricted_bouquet_id": str(app.restricted_bouquet_id) if app.restricted_bouquet_id else None,
-                "restrictedBouquetName": app.restricted_bouquet.title if app.restricted_bouquet else None,
+                "restrictedBouquetName": b_summary or (app.restricted_bouquet.title if app.restricted_bouquet else None),
+                "restricted_bouquets": b_list,
+                "restrictedBouquetsSummary": b_summary,
             }
 
             return standard_response(data=result, status_code=status.HTTP_201_CREATED)
@@ -435,7 +576,7 @@ class PartnerAppAdminViewSet(viewsets.ViewSet):
             return standard_response(error=str(e), status_code=status.HTTP_400_BAD_REQUEST)
 
     @action(detail=True, methods=["patch"], url_path="toggle-status")
-    def toggle_status(self, request: Request, pk: str = None) -> Response:
+    def toggle_status(self, request: Request, pk: str | None = None) -> Response:
         """PATCH /api/v1/partners/apps/<id>/toggle-status/ - Active ou suspend une clé API."""
         try:
             app = PartnerApp.objects.get(id=pk)
@@ -456,7 +597,7 @@ class PartnerAppAdminViewSet(viewsets.ViewSet):
             logger.exception("Erreur toggle status:")
             return standard_response(error=str(e), status_code=status.HTTP_400_BAD_REQUEST)
 
-    def partial_update(self, request: Request, pk: str = None) -> Response:
+    def partial_update(self, request: Request, pk: str | None = None) -> Response:
         """PATCH /api/v1/partners/apps/<id>/ - Met à jour les paramètres de l'application."""
         try:
             app = PartnerApp.objects.get(id=pk)
@@ -505,13 +646,40 @@ class PartnerAppAdminViewSet(viewsets.ViewSet):
                 else:
                     app.restricted_bouquet = None
 
+            if "restricted_bouquets_ids" in data or "restrictedBouquetIds" in data or "restricted_bouquet_ids" in data:
+                r_ids = (
+                    data.get("restricted_bouquets_ids") or
+                    data.get("restrictedBouquetIds") or
+                    data.get("restricted_bouquet_ids")
+                )
+                from apps.partners.models import BouquetOffering
+                if r_ids and isinstance(r_ids, list):
+                    valid_b = list(BouquetOffering.objects.filter(id__in=r_ids))
+                    app.restricted_bouquets.set(valid_b)
+                    if valid_b and not app.restricted_bouquet:
+                        app.restricted_bouquet = valid_b[0]
+                elif r_ids == []:
+                    app.restricted_bouquets.clear()
+                    app.restricted_bouquet = None
+
             app.quotas = quotas
             app.save()
+
+            upd_bouquets = [{"id": str(b.id), "title": b.title} for b in app.restricted_bouquets.all()]
+            upd_summary = ", ".join([b["title"] for b in upd_bouquets]) if upd_bouquets else None
+
+            upd_institution_expiry = None
+            if app.linked_institution:
+                latest_active = app.linked_institution.bouquet_subscriptions.filter(status="active").order_by("-end_date").first()
+                if latest_active:
+                    upd_institution_expiry = latest_active.end_date.strftime("%Y-%m-%d")
 
             return standard_response(data={
                 "id": str(app.id),
                 "name": app.name,
-                "partner": data.get("partner", app.name),
+                "partner": app.linked_institution.name if app.linked_institution else data.get("partner", app.name),
+                "institutionName": app.linked_institution.name if app.linked_institution else None,
+                "institutionExpirationDate": upd_institution_expiry,
                 "allowedOrigins": app.allowed_return_origins,
                 "webhookUrl": app.webhook_url,
                 "is_active": app.is_active,
@@ -523,7 +691,9 @@ class PartnerAppAdminViewSet(viewsets.ViewSet):
                 "allowedDocumentSources": quotas.get("allowed_document_sources", ["*"]),
                 "maxFileSizeMb": quotas.get("max_file_size_mb", 200),
                 "restricted_bouquet_id": str(app.restricted_bouquet_id) if app.restricted_bouquet_id else None,
-                "restrictedBouquetName": app.restricted_bouquet.title if app.restricted_bouquet else None,
+                "restrictedBouquetName": upd_summary or (app.restricted_bouquet.title if app.restricted_bouquet else None),
+                "restricted_bouquets": upd_bouquets,
+                "restrictedBouquetsSummary": upd_summary,
             })
         except PartnerApp.DoesNotExist:
             return standard_response(error="Application introuvable.", status_code=status.HTTP_404_NOT_FOUND)
@@ -531,7 +701,7 @@ class PartnerAppAdminViewSet(viewsets.ViewSet):
             logger.exception("Erreur update PartnerApp:")
             return standard_response(error=str(e), status_code=status.HTTP_400_BAD_REQUEST)
 
-    def destroy(self, request: Request, pk: str = None) -> Response:
+    def destroy(self, request: Request, pk: str | None = None) -> Response:
         """DELETE /api/v1/partners/apps/<id>/ - Révoque et supprime une application."""
         try:
             app = PartnerApp.objects.get(id=pk)
@@ -549,7 +719,7 @@ class PartnerAppAdminViewSet(viewsets.ViewSet):
             return standard_response(error=str(e), status_code=status.HTTP_400_BAD_REQUEST)
 
     @action(detail=True, methods=["post"], url_path="rotate-secret")
-    def rotate_secret(self, request: Request, pk: str = None) -> Response:
+    def rotate_secret(self, request: Request, pk: str | None = None) -> Response:
         """POST /api/v1/partners/apps/<id>/rotate-secret/ - Régénère le client secret."""
         try:
             app = PartnerApp.objects.get(id=pk)
@@ -659,7 +829,7 @@ class PartnerSessionSupervisionViewSet(viewsets.ViewSet):
             logger.exception("Erreur liste PartnerSession:")
             return standard_response(data=[], error=str(e), status_code=status.HTTP_200_OK)
 
-    def destroy(self, request: Request, pk: str = None) -> Response:
+    def destroy(self, request: Request, pk: str | None = None) -> Response:
         """DELETE /api/v1/partners/sessions/<id>/ - Révoque immédiatement une session de lecture."""
         try:
             session = ReaderSession.objects.get(id=pk)

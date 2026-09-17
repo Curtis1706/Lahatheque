@@ -10,6 +10,7 @@
 
 import * as React from "react";
 import { CountryFlag } from "@/components/ui/country-flag";
+import { ChevronDown } from "lucide-react";
 import { getCountries, AFRICAN_COUNTRIES_PRESET } from "@/lib/services/countries";
 
 export interface PhoneInputProps {
@@ -135,22 +136,26 @@ export function PhoneInput({
 
   return (
     <div
-      className={`flex items-center gap-2 w-full bg-background border border-border rounded-xl px-3 py-1 focus-within:ring-2 focus-within:ring-navy focus-within:border-transparent transition-all min-h-[44px] ${
+      className={`flex items-center gap-1.5 w-full bg-background border border-border rounded-xl px-2.5 py-1 focus-within:ring-2 focus-within:ring-navy focus-within:border-transparent transition-all min-h-[44px] ${
         disabled ? "opacity-60 cursor-not-allowed bg-background-secondary" : ""
       } ${className}`}
     >
-      {/* Drapeau & Sélecteur pays */}
-      <div className="flex items-center gap-1.5 border-r border-border pr-2 shrink-0">
+      {/* Drapeau & Sélecteur pays ultra-compact avec overlay natif */}
+      <div className="relative flex items-center gap-1 border-r border-border pr-2 shrink-0 select-none cursor-pointer hover:opacity-80 transition-opacity">
         <CountryFlag
           code={selectedCountry.code}
           title={selectedCountry.name}
-          className="w-5 h-3.5 rounded-xs shrink-0"
+          className="w-4 h-3 rounded-xs shrink-0"
         />
+        <span className="text-xs font-bold text-navy dark:text-gold font-mono whitespace-nowrap">
+          {selectedCountry.phoneCode}
+        </span>
+        <ChevronDown className="w-3 h-3 text-foreground-muted shrink-0" />
         <select
           value={selectedCountry.code}
           onChange={handleCountryChange}
           disabled={disabled}
-          className="bg-transparent text-xs font-bold text-navy dark:text-gold focus:outline-none cursor-pointer pr-1 py-1.5"
+          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
           aria-label="Indicatif téléphonique"
         >
           {countriesList.map((c) => (
@@ -159,13 +164,13 @@ export function PhoneInput({
               value={c.code}
               className="bg-background text-foreground"
             >
-              {c.code} ({c.phoneCode})
+              {c.name} ({c.phoneCode})
             </option>
           ))}
         </select>
       </div>
 
-      {/* Champ de saisie du numéro national */}
+      {/* Champ de saisie du numéro national — largeur maximale garantie */}
       <input
         id={id}
         name={name}
@@ -175,7 +180,7 @@ export function PhoneInput({
         disabled={disabled}
         required={required}
         placeholder={placeholder}
-        className="w-full bg-transparent text-xs sm:text-sm text-foreground focus:outline-none py-2 placeholder:text-foreground-muted"
+        className="w-full min-w-0 flex-1 bg-transparent text-xs sm:text-sm text-foreground focus:outline-none py-2 placeholder:text-foreground-muted font-mono"
       />
     </div>
   );

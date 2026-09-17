@@ -38,6 +38,16 @@ from .views import (
     LegalPendingPublicationListView,
     LegalPublishOuvrageView,
 )
+from .courrier_views import (
+    CourrierListView,
+    CourrierPrepareView,
+    CourrierPrepareBatchView,
+    CourrierDetailView,
+    CourrierPreviewPdfView,
+    CourrierValidateView,
+    CourrierCancelView,
+    CourrierSendEmailView,
+)
 
 app_name = 'rights'
 
@@ -85,5 +95,15 @@ urlpatterns = [
     path('legal/relances/', LegalRelancesListView.as_view(), name='legal-relances-list'),
     path('legal/pending-publication/', LegalPendingPublicationListView.as_view(), name='legal-pending-publication-list'),
     path('legal/pending-publication/<str:id>/publish/', LegalPublishOuvrageView.as_view(), name='legal-publish-ouvrage'),
+
+    # Courriers Officiels & Papier à En-tête LAHAThèque
+    path('legal/courriers/', CourrierListView.as_view(), name='legal-courriers-list'),
+    path('legal/courriers/prepare/', CourrierPrepareView.as_view(), name='legal-courriers-prepare'),
+    path('legal/courriers/prepare-batch/', CourrierPrepareBatchView.as_view(), name='legal-courriers-prepare-batch'),
+    path('legal/courriers/<uuid:id>/', CourrierDetailView.as_view(), name='legal-courriers-detail'),
+    path('legal/courriers/<uuid:id>/preview-pdf/', CourrierPreviewPdfView.as_view(), name='legal-courriers-preview-pdf'),
+    path('legal/courriers/<uuid:id>/validate/', CourrierValidateView.as_view(), name='legal-courriers-validate'),
+    path('legal/courriers/<uuid:id>/cancel/', CourrierCancelView.as_view(), name='legal-courriers-cancel'),
+    path('legal/courriers/<uuid:id>/send-email/', CourrierSendEmailView.as_view(), name='legal-courriers-send-email'),
 ]
 

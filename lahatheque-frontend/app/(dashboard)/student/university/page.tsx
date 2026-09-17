@@ -27,6 +27,7 @@ import {
   type InstitutionAPI,
   type BouquetAPI,
 } from "@/lib/services/student";
+import { BouquetBooksModal } from "@/components/features/bouquets/bouquet-books-modal";
 
 // ─── Badge Statut ─────────────────────────────────────────────────────────────
 
@@ -53,44 +54,60 @@ function StatusBadge({ status, display }: { status: string; display: string }) {
 // ─── Carte Bouquet ────────────────────────────────────────────────────
 
 function BouquetCard({ bouquet }: { bouquet: BouquetAPI }) {
-  const handleDownloadWord = () => {
-    toast.success(`Catalogue Word officiel (.doc) téléchargé pour ${bouquet.title}`);
-  };
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
 
   return (
-    <div className="p-5 rounded-3xl bg-background border border-border hover:border-gold/60 transition-all shadow-xs flex flex-col justify-between gap-3">
-      <div className="space-y-2">
-        <span className="text-[10px] font-bold uppercase tracking-wider text-gold px-2.5 py-0.5 rounded-md bg-navy/5 border border-gold/30">
-          {bouquet.bouquet_type || "Bouquet"} {bouquet.faculty_code && `— ${bouquet.faculty_code}`}
-        </span>
-        <h4 className="font-serif font-bold text-navy text-sm leading-snug">
-          {bouquet.title}
-        </h4>
-        <p className="text-xs text-foreground-muted">
-          Accès institutionnel accordé par le rectorat pour votre cursus académique.
-        </p>
-      </div>
-
-      <div className="pt-3 border-t border-border flex items-center justify-between text-xs flex-wrap gap-2">
-        <div className="flex items-center gap-1.5 text-foreground-muted">
-          <BookOpen className="w-3.5 h-3.5 text-gold" />
-          <span className="font-mono font-bold text-navy">
-            {bouquet.books_count}
+    <>
+      <div className="p-5 rounded-3xl bg-background border border-border hover:border-gold/60 transition-all shadow-xs flex flex-col justify-between gap-3">
+        <div className="space-y-2">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-gold px-2.5 py-0.5 rounded-md bg-navy/5 border border-gold/30">
+            {bouquet.bouquet_type || "Bouquet"} {bouquet.faculty_code && `— ${bouquet.faculty_code}`}
           </span>
-          <span>manuels inclus</span>
+          <h4 className="font-serif font-bold text-navy text-sm leading-snug">
+            {bouquet.title}
+          </h4>
+          <p className="text-xs text-foreground-muted">
+            Accès institutionnel accordé par le rectorat pour votre cursus académique.
+          </p>
         </div>
 
-        <button
-          type="button"
-          onClick={handleDownloadWord}
-          title="Télécharger la liste au format Word officiel"
-          className="inline-flex items-center gap-1 text-[11px] font-bold text-navy hover:text-gold transition-colors"
-        >
-          <FileText className="w-3.5 h-3.5 text-gold" />
-          Export Word
-        </button>
+        <div className="pt-3 border-t border-border flex items-center justify-between text-xs flex-wrap gap-2">
+          <div className="flex items-center gap-1.5 text-foreground-muted">
+            <BookOpen className="w-3.5 h-3.5 text-gold" />
+            <span className="font-mono font-bold text-navy">
+              {bouquet.books_count}
+            </span>
+            <span>manuels inclus</span>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setIsDetailsOpen(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors shadow-2xs cursor-pointer min-h-[36px]"
+          >
+            <BookOpen className="w-3.5 h-3.5 text-gold" />
+            <span>Lire les Ouvrages ({bouquet.books_count})</span>
+          </button>
+        </div>
       </div>
-    </div>
+
+      <BouquetBooksModal
+        bouquet={{
+          id: bouquet.id,
+          title: bouquet.title,
+          bouquet_type: bouquet.bouquet_type,
+          faculty_code: bouquet.faculty_code,
+          discipline: bouquet.discipline,
+          books_count: bouquet.books_count,
+          annual_price: 0,
+          is_subscribed: true,
+          end_date: bouquet.end_date,
+          books: (bouquet as any).books || [],
+        }}
+        isOpen={isDetailsOpen}
+        onClose={() => setIsDetailsOpen(false)}
+      />
+    </>
   );
 }
 

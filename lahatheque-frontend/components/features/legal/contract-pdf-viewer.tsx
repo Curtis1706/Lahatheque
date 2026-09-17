@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
+import Link from "next/link";
 import {
   FileText,
   ShieldCheck,
@@ -11,6 +12,10 @@ import {
   Minimize2,
   ExternalLink,
   Download,
+  AlertCircle,
+  FileQuestion,
+  Loader2,
+  ArrowLeft,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -66,6 +71,60 @@ export function ContractPdfViewer({
     return `/uploads/${fileUrl}`;
   }, [contractId, streamUrl, fileUrl]);
 
+  // Contrôle d'accessibilité réelle du fichier documentaire
+  const [fileStatus, setFileStatus] = useState<"checking" | "available" | "missing">("checking");
+  const [fileErrorMessage, setFileErrorMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!targetPdfUrl) {
+      setFileStatus("missing");
+      setFileErrorMessage("Aucun document n'a été rattaché à ce contrat.");
+      return;
+    }
+
+    let isMounted = true;
+    setFileStatus("checking");
+    setFileErrorMessage(null);
+
+    const controller = new AbortController();
+
+    // Vérification rapide de l'accessibilité du binaire
+    fetch(targetPdfUrl, {
+      method: "GET",
+      headers: { Range: "bytes=0-100" },
+      credentials: "include",
+      signal: controller.signal,
+    })
+      .then(async (res) => {
+        if (!isMounted) return;
+        const contentType = (res.headers.get("content-type") || "").toLowerCase();
+
+        if (!res.ok || contentType.includes("application/json")) {
+          let msg = "Le fichier de ce contrat est introuvable ou n'a pas encore été téléversé.";
+          try {
+            const data = await res.json();
+            if (data?.error) msg = data.error;
+          } catch {
+            // Pas de JSON
+          }
+          setFileStatus("missing");
+          setFileErrorMessage(msg);
+        } else {
+          setFileStatus("available");
+        }
+      })
+      .catch((err) => {
+        if (!isMounted || err.name === "AbortError") return;
+        setFileStatus("missing");
+        setFileErrorMessage("Le flux documentaire n'a pas pu être chargé.");
+      });
+
+    return () => {
+      isMounted = false;
+      controller.abort();
+    };
+  }, [targetPdfUrl]);
+
   // Écoute de la touche Échap pour quitter le mode Grand Écran
   useEffect(() => {
     if (!isGrandEcran) return;
@@ -98,6 +157,88 @@ export function ContractPdfViewer({
 
   const renderViewerContent = (isFull: boolean) => {
     if (viewMode === "preview" && !isDocx) {
+      if (fileStatus === "checking") {
+        return (
+          <div
+            className={cn(
+              "relative bg-background-secondary w-full flex flex-col items-center justify-center border border-border overflow-hidden p-8 space-y-3",
+              isFull
+                ? "flex-1 h-full rounded-none border-0"
+                : "rounded-2xl h-[700px] md:h-[820px] shadow-xs"
+            )}
+          >
+            <Loader2 className="w-8 h-8 text-gold animate-spin" />
+            <p className="text-xs text-foreground-muted font-medium">Chargement du document officiel...</p>
+          </div>
+        );
+      }
+
+      if (fileStatus === "missing") {
+        return (
+          <div
+            className={cn(
+              "relative bg-background w-full flex flex-col items-center justify-center border border-border text-center p-6 sm:p-12 space-y-5 overflow-y-auto",
+              isFull
+                ? "flex-1 h-full rounded-none border-0"
+                : "rounded-2xl min-h-[560px] md:h-[720px] shadow-xs"
+            )}
+          >
+            <div className="p-4 rounded-3xl bg-amber-500/10 text-amber-600 border border-amber-500/20 shadow-xs">
+              <FileQuestion className="w-10 h-10 text-amber-600" />
+            </div>
+
+            <div className="max-w-md space-y-2">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 text-amber-700 text-[11px] font-bold uppercase tracking-wider border border-amber-500/20">
+                <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                Document non disponible
+              </div>
+              <h3 className="font-serif font-bold text-navy text-xl sm:text-2xl">
+                Aucun Fichier de Contrat
+              </h3>
+              <p className="text-xs sm:text-sm text-foreground-muted leading-relaxed">
+                {fileErrorMessage || "Le fichier numérisé (PDF) de ce contrat n'a pas encore été téléversé dans la base certifiée ou son transfert est en attente."}
+              </p>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-background-secondary border border-border text-xs text-foreground-muted max-w-md w-full space-y-2.5 text-left">
+              <div className="flex justify-between items-center text-[11px]">
+                <span className="font-bold text-navy">Référence de l&apos;acte :</span>
+                <span className="font-mono text-gold font-bold">{reference}</span>
+              </div>
+              <div className="flex justify-between items-center text-[11px]">
+                <span className="font-bold text-navy">Fichier déclaré :</span>
+                <span className="font-mono text-foreground truncate max-w-[220px]">{fileName || "Non spécifié"}</span>
+              </div>
+              <div className="flex justify-between items-center text-[11px] pt-1.5 border-t border-border">
+                <span className="font-bold text-navy">Statut du versement :</span>
+                <span className="text-amber-700 font-bold bg-amber-500/15 px-2 py-0.5 rounded text-[10px]">En attente de téléversement</span>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+              {extractedText && (
+                <button
+                  type="button"
+                  onClick={() => setViewMode("summary")}
+                  className="px-4 py-2.5 rounded-xl bg-navy text-gold text-xs font-bold hover:bg-navy-dark transition-colors inline-flex items-center gap-2 border border-gold/30 shadow-xs cursor-pointer min-h-[44px]"
+                >
+                  <AlignLeft className="w-3.5 h-3.5" />
+                  <span>Consulter les clauses textuelles</span>
+                </button>
+              )}
+
+              <Link
+                href="/legal-reviewer/contracts"
+                className="px-4 py-2.5 rounded-xl bg-background-secondary border border-border text-navy text-xs font-bold hover:bg-background transition-colors inline-flex items-center gap-2 shadow-xs min-h-[44px]"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" />
+                <span>Retour aux contrats</span>
+              </Link>
+            </div>
+          </div>
+        );
+      }
+
       return (
         <div
           className={cn(
@@ -107,18 +248,11 @@ export function ContractPdfViewer({
               : "rounded-2xl h-[700px] md:h-[820px] shadow-xs"
           )}
         >
-          {targetPdfUrl ? (
-            <iframe
-              src={`${targetPdfUrl}#toolbar=1&navpanes=0&scrollbar=1`}
-              className="w-full h-full border-none bg-background-secondary"
-              title={`Lecture directe du contrat - ${title}`}
-            />
-          ) : (
-            <div className="flex flex-col items-center justify-center h-full text-foreground-muted text-xs p-6 space-y-2">
-              <FileText className="w-8 h-8 text-gold/50" />
-              <p>Aucun flux de document disponible pour ce contrat.</p>
-            </div>
-          )}
+          <iframe
+            src={`${targetPdfUrl}#toolbar=1&navpanes=0&scrollbar=1`}
+            className="w-full h-full border-none bg-background-secondary"
+            title={`Lecture directe du contrat - ${title}`}
+          />
         </div>
       );
     }
@@ -157,7 +291,7 @@ export function ContractPdfViewer({
                 ? "Fichier Word DOCX archivé dans le coffre juridique LAHAThèque."
                 : "Contrat juridique signé et archivé dans la base certifiée LAHAThèque."}
             </p>
-            {targetPdfUrl && (
+            {targetPdfUrl && fileStatus === "available" && (
               <a
                 href={targetPdfUrl}
                 download={fileName || "contrat.pdf"}
@@ -231,7 +365,7 @@ export function ContractPdfViewer({
                 </div>
               )}
 
-              {targetPdfUrl && (
+              {targetPdfUrl && fileStatus === "available" && (
                 <a
                   href={targetPdfUrl}
                   target="_blank"
@@ -295,10 +429,18 @@ export function ContractPdfViewer({
                 <span
                   className={cn(
                     "px-1.5 py-0.5 rounded font-bold uppercase text-[9px]",
-                    isDocx ? "bg-info/10 text-info" : "bg-gold/10 text-gold"
+                    fileStatus === "missing"
+                      ? "bg-amber-500/10 text-amber-700 border border-amber-500/20"
+                      : isDocx
+                      ? "bg-info/10 text-info"
+                      : "bg-gold/10 text-gold"
                   )}
                 >
-                  {isDocx ? "Format DOCX" : "Format PDF Numérisé"}
+                  {fileStatus === "missing"
+                    ? "En attente de versement"
+                    : isDocx
+                    ? "Format DOCX"
+                    : "Format PDF Numérisé"}
                 </span>
               </div>
             </div>
@@ -337,7 +479,7 @@ export function ContractPdfViewer({
               </div>
             )}
 
-            {targetPdfUrl && (
+            {targetPdfUrl && fileStatus === "available" && (
               <a
                 href={targetPdfUrl}
                 target="_blank"

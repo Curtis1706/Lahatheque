@@ -17,10 +17,13 @@ from .models import (
     UniversityRoyaltyStatement,
 )
 from apps.protection.models import TraceAcces
+from apps.catalog.models import Ouvrage
 
 
 def get_user_institution(user):
     """Récupère l'établissement rattaché à l'utilisateur connecté."""
+    if getattr(user, 'institution', None):
+        return user.institution
     if hasattr(user, 'university_profile') and user.university_profile:
         return user.university_profile
     inst = Institution.objects.filter(user=user).first()
@@ -50,19 +53,25 @@ class UniversityKpisView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsUniversityStaff]
 
     def get(self, request):
+        import logging
+        logger = logging.getLogger(__name__)
         user = request.user
         inst = get_user_institution(user)
+        logger.info(f"[UNIV KPIS] {timezone.now().isoformat()} - user={user.id} inst={'none' if not inst else inst.code} type={'none' if not inst else inst.institution_type}")
+
         if not inst:
             return Response({
                 "success": True,
                 "data": {
                     "institution_name": "Université Partenaire",
                     "institution_code": "UNIV",
+                    "institution_type": "partner",
                     "affiliated_students_count": 0,
                     "active_bouquets_count": 0,
                     "monthly_consultations_count": 0,
                     "total_royalties_available": 0.0,
                     "total_royalties_paid": 0.0,
+                    "revenue_split": None,
                     "currency": "XOF",
                     "consultations_trend_percent": 0.0,
                     "top_disciplines": [],
@@ -71,6 +80,141 @@ class UniversityKpisView(APIView):
                 "error": None
             })
 
+        # ── Branche Université Cliente : KPIs campus épurés, zéro redevance ──
+        if inst.institution_type == 'client':
+            return self._kpis_client(inst)
+
+        # ── Branche Université Partenaire : KPIs complets avec redevances ──
+        return self._kpis_partner(inst)
+
+    def _kpis_client(self, inst):
+        """KPIs pour Université Cliente — abonnements campus, lectures, commandes papier. Zéro redevance."""
+        import logging
+        logger = logging.getLogger(__name__)
+        from apps.reader.models import ReaderSession
+        from apps.student.models import ReadingSession as StudentReadingSession
+        from apps.audio.models import AudioListeningSession
+
+        affiliations_count = StudentAffiliation.objects.filter(
+            institution=inst,
+            status__in=['approved', 'active', 'validated']
+        ).count()
+        active_bouquets = UniversityBouquetSubscription.objects.filter(
+            institution=inst, status='active'
+        )
+        active_bouquets_count = active_bouquets.count()
+
+        # Ouvrages accessibles via bouquets souscrits actifs
+        from .models import BouquetOffering
+        accessible_books_ids = set()
+        for sub in active_bouquets:
+            offering = BouquetOffering.objects.filter(id=sub.offering_id).first() if sub.offering_id else None
+            if offering:
+                accessible_books_ids.update(
+                    offering.get_books_queryset(requesting_institution=inst).values_list('id', flat=True)
+                )
+        accessible_books_count = len(accessible_books_ids)
+
+        # Commandes papier institutionnelles
+        paper_orders_count = UniversityPaperOrder.objects.filter(institution=inst).count()
+
+        # Lectures campus (30 derniers jours)
+        monthly_reads = (
+            ReaderSession.objects.filter(
+                ouvrage_id__in=accessible_books_ids,
+                reading_time_seconds__gte=30,
+                created_at__gte=timezone.now() - timedelta(days=30)
+            ).count()
+            + StudentReadingSession.objects.filter(
+                ouvrage_id__in=accessible_books_ids,
+                duration_seconds__gte=30,
+                created_at__gte=timezone.now() - timedelta(days=30)
+            ).count()
+            + AudioListeningSession.objects.filter(
+                ouvrage_id__in=accessible_books_ids,
+                created_at__gte=timezone.now() - timedelta(days=30)
+            ).count()
+        ) if accessible_books_ids else 0
+
+        # Tendance consultations M vs M-1
+        prev_reads = (
+            ReaderSession.objects.filter(
+                ouvrage_id__in=accessible_books_ids,
+                reading_time_seconds__gte=30,
+                created_at__gte=timezone.now() - timedelta(days=60),
+                created_at__lt=timezone.now() - timedelta(days=30)
+            ).count()
+            + StudentReadingSession.objects.filter(
+                ouvrage_id__in=accessible_books_ids,
+                duration_seconds__gte=30,
+                created_at__gte=timezone.now() - timedelta(days=60),
+                created_at__lt=timezone.now() - timedelta(days=30)
+            ).count()
+        ) if accessible_books_ids else 0
+
+        if prev_reads > 0:
+            trend = round(((monthly_reads - prev_reads) / prev_reads) * 100, 1)
+        else:
+            trend = 0.0 if monthly_reads == 0 else 100.0
+
+        # Timeline réelle des consultations sur 4 semaines glissantes
+        consultations_timeline = []
+        month_abbr = ["Janv", "Févr", "Mars", "Avr", "Mai", "Juin", "Juil", "Août", "Sept", "Oct", "Nov", "Déc"]
+        for i in range(3, -1, -1):
+            w_start = timezone.now() - timedelta(days=(i + 1) * 7)
+            w_end = timezone.now() - timedelta(days=i * 7)
+            w_count = (
+                ReaderSession.objects.filter(
+                    ouvrage_id__in=accessible_books_ids,
+                    reading_time_seconds__gte=30,
+                    created_at__gte=w_start,
+                    created_at__lt=w_end
+                ).count()
+                + StudentReadingSession.objects.filter(
+                    ouvrage_id__in=accessible_books_ids,
+                    duration_seconds__gte=30,
+                    created_at__gte=w_start,
+                    created_at__lt=w_end
+                ).count()
+                + AudioListeningSession.objects.filter(
+                    ouvrage_id__in=accessible_books_ids,
+                    created_at__gte=w_start,
+                    created_at__lt=w_end
+                ).count()
+            ) if accessible_books_ids else 0
+            consultations_timeline.append({
+                "date": f"{w_start.day:02d} {month_abbr[w_start.month - 1]}",
+                "value": w_count
+            })
+
+        logger.info(f"[UNIV KPIS] {timezone.now().isoformat()} - CLIENT {inst.code}: bouquets={active_bouquets_count} livres={accessible_books_count} lectures={monthly_reads}")
+
+        return Response({
+            "success": True,
+            "data": {
+                "institution_name": inst.name,
+                "institution_code": inst.code,
+                "institution_type": "client",
+                "affiliated_students_count": affiliations_count,
+                "active_bouquets_count": active_bouquets_count,
+                "accessible_books_count": accessible_books_count,
+                "monthly_consultations_count": monthly_reads,
+                "consultations_timeline": consultations_timeline,
+                "paper_orders_count": paper_orders_count,
+                "total_royalties_available": 0.0,
+                "total_royalties_paid": 0.0,
+                "revenue_split": None,
+                "audience_share_percent": 0.0,
+                "currency": "XOF",
+                "consultations_trend_percent": trend,
+                "top_disciplines": [],
+                "faculty_distribution": [],
+            },
+            "error": None
+        })
+
+    def _kpis_partner(self, inst):
+        """KPIs complets pour Université Partenaire — redevances, répartition CA, parts d'audience."""
         from django.db.models import Q
         affiliations_count = StudentAffiliation.objects.filter(
             institution=inst, 
@@ -85,8 +229,48 @@ class UniversityKpisView(APIView):
             timestamp__gte=timezone.now() - timedelta(days=30)
         ).count()
 
+        # ── Intégration dynamique des consultations et redevances du Bouquet Général ──
+        from apps.reporting.admin_views import compute_bouquet_distribution_payload
+        from apps.reader.models import ReaderSession
+        from apps.student.models import ReadingSession as StudentReadingSession
+        from apps.audio.models import AudioListeningSession
+
+        partner_reads = ReaderSession.objects.filter(
+            ouvrage__institution=inst,
+            reading_time_seconds__gte=30,
+            last_page__gte=3,
+            created_at__gte=timezone.now() - timedelta(days=30)
+        ).count()
+
+        student_reads = StudentReadingSession.objects.filter(
+            ouvrage__institution=inst,
+            duration_seconds__gte=30,
+            pages_read__gte=3,
+            created_at__gte=timezone.now() - timedelta(days=30)
+        ).count()
+
+        audio_reads = AudioListeningSession.objects.filter(
+            ouvrage__institution=inst,
+            created_at__gte=timezone.now() - timedelta(days=30)
+        ).count()
+
+        total_monthly_consultations = monthly_consultations + partner_reads + student_reads + audio_reads
+
+        # Récupération de la part temps réel du Bouquet Général pour l'établissement
+        bouquet_general_data = compute_bouquet_distribution_payload("general", requesting_institution_id=str(inst.id))
+        general_ca = 0.0
+        general_royalty = 0.0
+        inst_audience_pct = 0.0
+        if bouquet_general_data and "distribution" in bouquet_general_data:
+            for item in bouquet_general_data["distribution"]:
+                if str(item.get("institution_id")) == str(inst.id):
+                    general_ca = float(item.get("ca_share", 0.0) or 0.0)
+                    general_royalty = float(item.get("royalty_amount", 0.0) or 0.0)
+                    inst_audience_pct = float(item.get("usage_percentage", 0.0) or 0.0)
+                    break
+
         statements = UniversityRoyaltyStatement.objects.filter(institution=inst)
-        avail_royalty = float(statements.filter(status='available').aggregate(s=Sum('net_royalty_amount'))['s'] or 0.0)
+        avail_royalty = float(statements.filter(status='available').aggregate(s=Sum('net_royalty_amount'))['s'] or 0.0) + general_royalty
         paid_royalty = float(statements.filter(status='paid').aggregate(s=Sum('net_royalty_amount'))['s'] or 0.0)
 
         faculties = Faculty.objects.filter(institution=inst)
@@ -134,25 +318,68 @@ class UniversityKpisView(APIView):
                 for item in faculty_distrib:
                     item["percent"] = round((item["consultations"] / total_disc_c) * 100, 1)
 
-        total_ca = statements.aggregate(s=Sum('total_sales_catalog'))['s'] or Decimal('0.00')
-        total_university_share = statements.aggregate(s=Sum('net_royalty_amount'))['s'] or Decimal('0.00')
-        total_laha_share = total_ca - total_university_share
+        raw_stmt_ca = float(statements.aggregate(s=Sum('total_sales_catalog'))['s'] or Decimal('0.00'))
+        raw_stmt_univ = float(statements.aggregate(s=Sum('net_royalty_amount'))['s'] or Decimal('0.00'))
+
+        total_ca = raw_stmt_ca + general_ca
+        total_university_share = raw_stmt_univ + general_royalty
+        total_laha_share = max(0.0, total_ca - total_university_share)
 
         if total_ca > 0:
-            university_share_percent = round(float(total_university_share / total_ca) * 100, 1)
+            university_share_percent = round((total_university_share / total_ca) * 100, 1)
             laha_share_percent = round(100 - university_share_percent, 1)
         else:
             university_share_percent = 0.0
             laha_share_percent = 0.0
 
         revenue_split = {
-            "total_ca": float(total_ca),
-            "university_amount": float(total_university_share),
+            "total_ca": round(total_ca, 2),
+            "university_amount": round(total_university_share, 2),
             "university_percent": university_share_percent,
-            "laha_amount": float(total_laha_share),
+            "laha_amount": round(total_laha_share, 2),
             "laha_percent": laha_share_percent,
             "currency": "XOF",
         }
+
+        # Ouvrages déposés réels de l'université partenaire
+        catalog_books_count = Ouvrage.objects.filter(institution=inst, status='published').count()
+
+        # Timeline réelle des consultations sur 4 semaines glissantes
+        consultations_timeline = []
+        month_abbr = ["Janv", "Févr", "Mars", "Avr", "Mai", "Juin", "Juil", "Août", "Sept", "Oct", "Nov", "Déc"]
+        for i in range(3, -1, -1):
+            w_start = timezone.now() - timedelta(days=(i + 1) * 7)
+            w_end = timezone.now() - timedelta(days=i * 7)
+            w_count = (
+                TraceAcces.objects.filter(
+                    Q(institution=inst) | Q(ouvrage__institution=inst),
+                    timestamp__gte=w_start,
+                    timestamp__lt=w_end
+                ).count()
+                + ReaderSession.objects.filter(
+                    ouvrage__institution=inst,
+                    reading_time_seconds__gte=30,
+                    last_page__gte=3,
+                    created_at__gte=w_start,
+                    created_at__lt=w_end
+                ).count()
+                + StudentReadingSession.objects.filter(
+                    ouvrage__institution=inst,
+                    duration_seconds__gte=30,
+                    pages_read__gte=3,
+                    created_at__gte=w_start,
+                    created_at__lt=w_end
+                ).count()
+                + AudioListeningSession.objects.filter(
+                    ouvrage__institution=inst,
+                    created_at__gte=w_start,
+                    created_at__lt=w_end
+                ).count()
+            )
+            consultations_timeline.append({
+                "date": f"{w_start.day:02d} {month_abbr[w_start.month - 1]}",
+                "value": w_count
+            })
 
         # Calcul dynamique de la tendance (mois courant vs mois précédent)
         previous_month_consultations = TraceAcces.objects.filter(
@@ -163,21 +390,25 @@ class UniversityKpisView(APIView):
 
         if previous_month_consultations > 0:
             consultations_trend = round(
-                ((monthly_consultations - previous_month_consultations) / previous_month_consultations) * 100, 1
+                ((total_monthly_consultations - previous_month_consultations) / previous_month_consultations) * 100, 1
             )
         else:
-            consultations_trend = 0.0 if monthly_consultations == 0 else 100.0
+            consultations_trend = 0.0 if total_monthly_consultations == 0 else 100.0
 
         return Response({
             "success": True,
             "data": {
                 "institution_name": inst.name,
                 "institution_code": inst.code,
+                "institution_type": "partner",
+                "catalog_books_count": catalog_books_count,
                 "affiliated_students_count": affiliations_count,
                 "active_bouquets_count": bouquets_count,
-                "monthly_consultations_count": monthly_consultations,
-                "total_royalties_available": avail_royalty,
+                "monthly_consultations_count": total_monthly_consultations,
+                "consultations_timeline": consultations_timeline,
+                "total_royalties_available": round(avail_royalty, 2),
                 "total_royalties_paid": paid_royalty,
+                "audience_share_percent": inst_audience_pct,
                 "currency": "XOF",
                 "consultations_trend_percent": consultations_trend,
                 "top_disciplines": top_disc,
@@ -241,6 +472,34 @@ class UniversityBouquetsView(APIView):
 
     def get(self, request):
         from .models import BouquetOffering
+        from apps.catalog.models import Ouvrage
+
+        def serialize_bouquet_books(qs):
+            books_data = []
+            for bk in qs.select_related('discipline', 'institution').prefetch_related('authors')[:60]:
+                cover_url = None
+                if bk.cover_image:
+                    try:
+                        cover_url = bk.cover_image.url
+                    except Exception:
+                        cover_url = None
+                authors_list = [f"{a.first_name} {a.last_name}".strip() for a in bk.authors.all() if f"{a.first_name} {a.last_name}".strip()]
+                author_display = ", ".join(authors_list) if authors_list else "Auteur académique"
+                books_data.append({
+                    "id": str(bk.id),
+                    "title": bk.title,
+                    "subtitle": bk.subtitle or "",
+                    "authors": authors_list,
+                    "author": author_display,
+                    "discipline": bk.discipline.name if bk.discipline else "",
+                    "cover_url": cover_url,
+                    "page_count": bk.page_count,
+                    "format_type": "digital",
+                    "isbn": bk.isbn or "",
+                    "summary": bk.summary or "",
+                    "has_sample": True,
+                })
+            return books_data
 
         inst = get_user_institution(request.user)
         subscribed_offering_ids = set()
@@ -250,7 +509,8 @@ class UniversityBouquetsView(APIView):
             subs = UniversityBouquetSubscription.objects.filter(institution=inst)
             for b in subs:
                 offering = BouquetOffering.objects.filter(id=b.offering_id).first() if b.offering_id else None
-                my_cnt = offering.get_books_queryset(requesting_institution=inst).filter(institution=inst).count() if (offering and inst) else 0
+                b_qs = offering.get_books_queryset(requesting_institution=inst) if offering else Ouvrage.objects.filter(status='published')
+                my_cnt = b_qs.filter(institution=inst).count() if inst else 0
                 subscribed_data.append({
                     "id": str(b.id),
                     "offering_id": str(b.offering_id) if b.offering_id else None,
@@ -260,18 +520,22 @@ class UniversityBouquetsView(APIView):
                     "discipline": b.discipline,
                     "books_count": b.books_count,
                     "my_books_count": my_cnt,
+                    "subscription_period": getattr(b, 'subscription_period', 'annual'),
+                    "price_paid": float(b.price_paid or 0),
+                    "monthly_price": float(offering.get_real_monthly_price()) if (offering and hasattr(offering, 'get_real_monthly_price')) else 50000.0,
                     "annual_price": float(b.annual_price),
                     "currency": b.currency,
                     "status": b.status,
                     "start_date": str(b.start_date),
                     "end_date": str(b.end_date),
                     "is_subscribed": True,
+                    "books": serialize_bouquet_books(b_qs),
                 })
                 if b.offering_id:
                     subscribed_offering_ids.add(str(b.offering_id))
 
         available_data = []
-        for o in BouquetOffering.objects.filter(is_active=True).exclude(id__in=subscribed_offering_ids):
+        for o in BouquetOffering.objects.filter(is_active=True).exclude(id__in=subscribed_offering_ids).exclude(bouquet_type="general"):
             b_qs = o.get_books_queryset(requesting_institution=inst)
             available_data.append({
                 "id": str(o.id),
@@ -283,11 +547,13 @@ class UniversityBouquetsView(APIView):
                 "country": o.country,
                 "books_count": b_qs.count(),
                 "my_books_count": b_qs.filter(institution=inst).count() if inst else 0,
-                "annual_price": float(o.annual_price),
+                "monthly_price": float(o.get_real_monthly_price() if hasattr(o, 'get_real_monthly_price') else (o.monthly_price or 50000.0)),
+                "annual_price": float(o.get_real_annual_price() if hasattr(o, 'get_real_annual_price') else o.annual_price),
                 "currency": o.currency,
                 "description": o.description,
                 "status": "available",
                 "is_subscribed": False,
+                "books": serialize_bouquet_books(b_qs),
             })
 
         return Response({"success": True, "data": available_data + subscribed_data, "error": None})
@@ -356,6 +622,8 @@ class UniversityBouquetSubscribeView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsUniversityStaff]
 
     def post(self, request, pk):
+        import logging
+        logger = logging.getLogger(__name__)
         from .models import BouquetOffering
         from apps.commerce.models import Currency, PaymentTransaction
         from apps.commerce.payment_providers import get_payment_provider
@@ -365,18 +633,33 @@ class UniversityBouquetSubscribeView(APIView):
         if not inst:
             return Response({"success": False, "error": "Université introuvable"}, status=400)
 
+        # ── Garde d'accès T013 : les universités partenaires ne souscrivent pas à des bouquets ──
+        if inst.institution_type == 'partner':
+            logger.warning(f"[UNIV ACCESS GUARD] {timezone.now().isoformat()} - 403 BLOCKED partner {inst.code} on /bouquets/subscribe")
+            return Response(
+                {"success": False, "error": "Les universités partenaires n'ont pas accès à la souscription de bouquets documentaires. Consultez votre portail de redevances.", "data": None},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
         try:
             offering = BouquetOffering.objects.get(id=pk, is_active=True)
+            if offering.bouquet_type == "general":
+                return Response({"success": False, "error": "Le Bouquet Général est un bouquet système global et n'est pas ouvert à la souscription directe."}, status=400)
         except BouquetOffering.DoesNotExist:
             return Response({"success": False, "error": "Bouquet introuvable ou indisponible."}, status=404)
 
-        if UniversityBouquetSubscription.objects.filter(
-            institution=inst, offering_id=offering.id, status='active'
-        ).exists():
-            return Response({"success": False, "error": "Ce bouquet est déjà souscrit."}, status=400)
+        period = request.data.get("period", "annual")
+        if period not in ["monthly", "annual"]:
+            period = "annual"
 
+        amount = offering.get_real_monthly_price() if period == "monthly" else offering.get_real_annual_price()
+
+        existing_sub = UniversityBouquetSubscription.objects.filter(
+            institution=inst, offering_id=offering.id, status='active'
+        ).order_by('-end_date').first()
+        existing_end_date = existing_sub.end_date if existing_sub else None
         start = timezone.now().date()
-        end = start + timedelta(days=365)
+        end = UniversityBouquetSubscription.compute_end_date(existing_end_date, period)
 
         # Créer la souscription en statut 'pending' (PAS 'active')
         sub = UniversityBouquetSubscription.objects.create(
@@ -387,6 +670,8 @@ class UniversityBouquetSubscribeView(APIView):
             faculty_code=offering.faculty_code,
             discipline=offering.discipline,
             books_count=offering.get_books_queryset(requesting_institution=inst).count(),
+            subscription_period=period,
+            price_paid=amount,
             annual_price=offering.annual_price,
             currency=offering.currency,
             status="pending",  # <-- PAS 'active' tant que le paiement n'est pas confirmé
@@ -404,10 +689,12 @@ class UniversityBouquetSubscribeView(APIView):
                 "data": {
                     "bouquet_id": str(sub.id),
                     "status": "pending",
+                    "period": period,
+                    "price_paid": float(amount),
                     "start_date": str(sub.start_date),
                     "end_date": str(sub.end_date),
                     "message": (
-                        f"Souscription au bouquet « {offering.title} » enregistrée. "
+                        f"Souscription ({'Mensuelle' if period == 'monthly' else 'Annuelle'}) au bouquet « {offering.title} » enregistrée. "
                         f"Réglez par {mode_paiement} pour finaliser — un agent LAHA Éditions vous contactera."
                     ),
                 },
@@ -421,19 +708,20 @@ class UniversityBouquetSubscribeView(APIView):
 
         provider = get_payment_provider("moneroo")
         frontend_base = get_frontend_base_url(request)
-        return_url = request.data.get("return_url") or f"{frontend_base}/university/bouquets"
+        return_url = request.data.get("return_url") or f"{frontend_base}/university/bouquets/success?subscription_id={sub.id}"
 
         try:
             payment_res = provider.initiate_payment(
-                amount=offering.annual_price,
+                amount=amount,
                 currency=currency.code,
-                description=f"Bouquet « {offering.title} » — {inst.name}",
+                description=f"Bouquet « {offering.title} » ({'Mensuel 30j' if period == 'monthly' else 'Annuel 365j'}) — {inst.name}",
                 customer_email=request.user.email,
                 customer_name=request.user.get_full_name() or request.user.email,
                 return_url=return_url,
                 metadata={
                     "bouquet_subscription_id": str(sub.id),
                     "institution_id": str(inst.id),
+                    "subscription_period": period,
                     "type": "bouquet_university",
                 },
             ) or {}
@@ -450,7 +738,7 @@ class UniversityBouquetSubscribeView(APIView):
         # Créer la transaction de paiement
         tx = PaymentTransaction.objects.create(
             user=request.user,
-            amount=offering.annual_price,
+            amount=amount,
             currency=currency,
             status=payment_res.get("status", "pending"),
             moneroo_id=payment_res.get("moneroo_id") or payment_res.get("payment_id"),
@@ -472,10 +760,12 @@ class UniversityBouquetSubscribeView(APIView):
             "data": {
                 "bouquet_id": str(sub.id),
                 "status": sub.status,
+                "period": period,
+                "price_paid": float(amount),
                 "checkout_url": payment_res.get("checkout_url"),
                 "start_date": str(sub.start_date),
                 "end_date": str(sub.end_date),
-                "message": f"Souscription au bouquet « {offering.title} » initiée. Redirection vers le paiement.",
+                "message": f"Souscription au bouquet « {offering.title} » ({'Mensuelle' if period == 'monthly' else 'Annuelle'}) initiée. Redirection vers le paiement sécurisé.",
             },
             "error": None
         })
@@ -704,11 +994,23 @@ class UniversityPaperOrdersView(APIView):
 
 
 class UniversityRoyaltiesView(APIView):
-    """GET /api/v1/partners/university/royalties/ - Suivi des redevances et versements."""
+    """GET /api/v1/partners/university/royalties/ - Suivi des redevances et versements (Partenaires uniquement)."""
     permission_classes = [permissions.IsAuthenticated, IsUniversityStaff]
 
     def get(self, request):
+        import logging
+        logger = logging.getLogger(__name__)
         inst = get_user_institution(request.user)
+        logger.info(f"[UNIV ACCESS GUARD] {timezone.now().isoformat()} - royalties GET user={request.user.id} inst={'none' if not inst else inst.code} type={'none' if not inst else inst.institution_type}")
+
+        # ── Garde d'accès : les universités clientes ne peuvent pas consulter les redevances ──
+        if inst and inst.institution_type == 'client':
+            logger.warning(f"[UNIV ACCESS GUARD] {timezone.now().isoformat()} - 403 BLOCKED client {inst.code} on /royalties")
+            return Response(
+                {"success": False, "error": "Accès non autorisé. Les universités clientes n'ont pas accès au portail des redevances.", "data": None},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
         from apps.reporting.pricing_service import get_institution_royalty_rate
         rate = get_institution_royalty_rate(inst)
 
@@ -748,8 +1050,36 @@ class UniversityRoyaltiesView(APIView):
                 "pdf_statement_url": r.pdf_statement_url or None,
                 "created_at": r.created_at.isoformat() if r.created_at else str(timezone.now())
             })
-        avail_bal = float(qs.filter(status='available').aggregate(s=Sum('net_royalty_amount'))['s'] or 0.0)
+
+        # ── Intégration en temps réel des redevances du Bouquet Général ──
+        from apps.reporting.admin_views import compute_bouquet_distribution_payload
+        bouquet_general_data = compute_bouquet_distribution_payload("general", requesting_institution_id=str(inst.id))
+        general_ca = 0.0
+        general_royalty = 0.0
+        if bouquet_general_data and "distribution" in bouquet_general_data:
+            for item in bouquet_general_data["distribution"]:
+                if str(item.get("institution_id")) == str(inst.id):
+                    general_ca = float(item.get("ca_share", 0.0) or 0.0)
+                    general_royalty = float(item.get("royalty_amount", 0.0) or 0.0)
+                    break
+
+        avail_bal = float(qs.filter(status='available').aggregate(s=Sum('net_royalty_amount'))['s'] or 0.0) + general_royalty
         total_paid = float(qs.filter(status='paid').aggregate(s=Sum('net_royalty_amount'))['s'] or 0.0)
+
+        if general_royalty > 0:
+            statements.insert(0, {
+                "id": "bouquet-general-realtime",
+                "reference": "REP-BOUQ-GENERAL",
+                "period": "En cours (Bouquet Général)",
+                "total_sales_catalog": general_ca,
+                "royalty_rate": rate,
+                "applied_rate": rate,
+                "net_royalty_amount": general_royalty,
+                "currency": "XOF",
+                "status": "available",
+                "pdf_statement_url": None,
+                "created_at": timezone.now().isoformat()
+            })
 
         # Extraction des ventes unitaires réelles des ouvrages de l'institution
         from apps.commerce.models import LigneCommande
@@ -828,72 +1158,58 @@ class UniversityRoyaltiesView(APIView):
         audio_gross_total = sum(s["gross_amount"] for s in unit_sales if s["format"] == "audio")
         audio_royalties_total = sum(s["royalty_amount"] for s in unit_sales if s["format"] == "audio")
 
-        # Extraction des bouquets réels associés à l'institution (Section 11 CDC - Zéro mock, zéro faculté)
+        # Extraction des bouquets réels associés à l'institution partenaire (CDC Section 11 & 12 - Zéro mock)
         from .models import BouquetOffering, UniversityBouquetSubscription
-        from apps.reader.models import ReaderSession
-        from apps.protection.models import TraceAcces
+        from apps.reporting.admin_views import compute_bouquet_distribution_payload
 
         bouquet_royalties = []
         bouquet_consultations_count = 0
         bouquet_gross_allocated = 0.0
         bouquet_royalties_total = 0.0
 
-        subscriptions = UniversityBouquetSubscription.objects.filter(
-            institution=inst,
-            status='active'
-        ).select_related('institution')
+        # Identifier les bouquets actifs qui intègrent des ouvrages de cette université partenaire
+        active_offerings = BouquetOffering.objects.filter(is_active=True)
+        relevant_offerings = []
+        for off in active_offerings:
+            books_qs = off.get_books_queryset(requesting_institution=inst)
+            if books_qs.filter(institution=inst).exists():
+                relevant_offerings.append((off, books_qs))
 
-        for sub in subscriptions:
-            offering = BouquetOffering.objects.filter(id=sub.offering_id).first() if sub.offering_id else None
-            books_qs = offering.get_books_queryset(requesting_institution=inst) if offering else inst.ouvrages.filter(status='published')
-            total_books_in_bouquet = books_qs.count()
-            inst_books_in_bouquet = books_qs.filter(institution=inst)
-            books_inc_cnt = inst_books_in_bouquet.count()
+        for offering, books_qs in relevant_offerings:
+            payload = compute_bouquet_distribution_payload(offering, requesting_institution_id=str(inst.id))
+            inst_item = None
+            if payload and "distribution" in payload:
+                for item in payload["distribution"]:
+                    if str(item.get("institution_id")) == str(inst.id):
+                        inst_item = item
+                        break
 
-            # Consultations réelles consolidées (ReaderSession + TraceAcces)
-            total_sessions = ReaderSession.objects.filter(
-                source_type='catalog_book',
-                ouvrage__in=books_qs
-            ).count() + TraceAcces.objects.filter(ouvrage__in=books_qs).count()
+            inst_books_cnt = inst_item["books_owned_count"] if inst_item else books_qs.filter(institution=inst).count()
+            total_bouquet_consultations = payload.get("total_consultations", 0) if payload else 0
+            univ_consultations = inst_item.get("reads_count", 0) if inst_item else 0
+            share_pct = inst_item.get("usage_percentage", 0.0) if inst_item else 0.0
+            allocated_rev = inst_item.get("ca_share", 0.0) if inst_item else 0.0
+            royalty_amt = inst_item.get("royalty_amount", 0.0) if inst_item else 0.0
+            applied_rate = inst_item.get("royalty_rate", rate) if inst_item else rate
 
-            univ_sessions = ReaderSession.objects.filter(
-                source_type='catalog_book',
-                ouvrage__in=inst_books_in_bouquet
-            ).count() + TraceAcces.objects.filter(ouvrage__in=inst_books_in_bouquet).count()
-
-            if total_sessions > 0:
-                share_pct = (univ_sessions / total_sessions * 100.0)
-            elif total_books_in_bouquet > 0:
-                share_pct = (books_inc_cnt / total_books_in_bouquet * 100.0)
-            else:
-                share_pct = 0.0
-
-            annual_price = float(sub.annual_price or 0)
-            allocated_revenue = annual_price * (share_pct / 100.0)
-            b_royalty = allocated_revenue * (rate / 100.0)
-
-            bouquet_consultations_count += univ_sessions
-            bouquet_gross_allocated += allocated_revenue
-            bouquet_royalties_total += b_royalty
-
-            start_str = sub.start_date.strftime('%d/%m/%Y') if sub.start_date else ""
-            end_str = sub.end_date.strftime('%d/%m/%Y') if sub.end_date else ""
-            period_str = f"{start_str} - {end_str}".strip(" -") or "Annuel"
+            bouquet_consultations_count += univ_consultations
+            bouquet_gross_allocated += allocated_rev
+            bouquet_royalties_total += royalty_amt
 
             bouquet_royalties.append({
-                "id": str(sub.id),
-                "bouquet_id": str(sub.offering_id) if sub.offering_id else str(sub.id),
-                "bouquet_title": sub.title,
-                "period": period_str,
-                "books_included_count": books_inc_cnt,
-                "total_bouquet_consultations": total_sessions,
-                "university_consultations": univ_sessions,
+                "id": str(offering.id),
+                "bouquet_id": str(offering.id),
+                "bouquet_title": offering.title,
+                "period": "En cours (Annuel)",
+                "books_included_count": inst_books_cnt,
+                "total_bouquet_consultations": total_bouquet_consultations,
+                "university_consultations": univ_consultations,
                 "consultation_share_percent": round(share_pct, 2),
-                "bouquet_revenue_allocated": round(allocated_revenue, 2),
-                "royalty_rate": rate,
-                "applied_rate": rate,
-                "net_royalty_amount": round(b_royalty, 2),
-                "currency": sub.currency or "XOF",
+                "bouquet_revenue_allocated": round(allocated_rev, 2),
+                "royalty_rate": applied_rate,
+                "applied_rate": applied_rate,
+                "net_royalty_amount": round(royalty_amt, 2),
+                "currency": offering.currency or "XOF",
             })
 
         total_earned = paper_royalties_total + digital_royalties_total + audio_royalties_total + bouquet_royalties_total
@@ -937,11 +1253,23 @@ class UniversityRoyaltiesView(APIView):
 
 
 class UniversityRoyaltyWithdrawView(APIView):
-    """POST /api/v1/partners/university/royalties/withdraw/ - Demande de versement des redevances."""
+    """POST /api/v1/partners/university/royalties/withdraw/ - Demande de versement (Partenaires uniquement)."""
     permission_classes = [permissions.IsAuthenticated, IsUniversityStaff]
 
     def post(self, request):
+        import logging
+        logger = logging.getLogger(__name__)
         inst = get_user_institution(request.user)
+        logger.info(f"[UNIV ACCESS GUARD] {timezone.now().isoformat()} - royalties WITHDRAW user={request.user.id} inst={'none' if not inst else inst.code} type={'none' if not inst else inst.institution_type}")
+
+        # ── Garde d'accès : les universités clientes ne peuvent pas demander de versement ──
+        if inst and inst.institution_type == 'client':
+            logger.warning(f"[UNIV ACCESS GUARD] {timezone.now().isoformat()} - 403 BLOCKED client {inst.code} on /royalties/withdraw")
+            return Response(
+                {"success": False, "error": "Accès non autorisé. Les universités clientes ne perçoivent pas de redevances.", "data": None},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
         if not inst:
             return Response({"success": False, "error": "Université introuvable"}, status=400)
 
@@ -1300,5 +1628,221 @@ class BouquetRelevanceReportView(APIView):
                 "matched_disciplines": sorted(matched_disciplines),
             }
         })
+
+
+class UniversityClientCatalogView(APIView):
+    """GET /api/v1/partners/university/catalog/ - Ouvrages numériques accessibles via les bouquets actifs (Universités Clientes)."""
+    permission_classes = [permissions.IsAuthenticated, IsUniversityStaff]
+
+    def get(self, request):
+        import logging
+        logger = logging.getLogger(__name__)
+        from .models import BouquetOffering
+        from apps.catalog.models import Ouvrage
+
+        inst = get_user_institution(request.user)
+        logger.info(f"[UNIV CATALOG] {timezone.now().isoformat()} - catalog GET user={request.user.id} inst={'none' if not inst else inst.code} type={'none' if not inst else inst.institution_type}")
+
+        if not inst:
+            return Response({"success": True, "data": [], "error": None})
+
+        # Les partenaires n'ont pas de catalogue d'abonnement — leur catalogue = leurs ouvrages propres
+        if inst.institution_type == 'partner':
+            return Response(
+                {"success": False, "error": "Les universités partenaires accèdent à leurs ouvrages depuis leur portail de redevances.", "data": None},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # Collecter les ouvrages accessibles via les bouquets actifs souscrits
+        active_subs = UniversityBouquetSubscription.objects.filter(institution=inst, status='active')
+        accessible_ids: set = set()
+        bouquet_map: dict = {}  # book_id -> bouquet title(s)
+
+        for sub in active_subs:
+            offering = BouquetOffering.objects.filter(id=sub.offering_id).first() if sub.offering_id else None
+            if offering:
+                book_ids = list(offering.get_books_queryset(requesting_institution=inst).values_list('id', flat=True))
+                for bid in book_ids:
+                    accessible_ids.add(bid)
+                    bouquet_map.setdefault(str(bid), []).append(sub.title)
+
+        if not accessible_ids:
+            return Response({"success": True, "data": [], "error": None})
+
+        # Filtres optionnels
+        search = request.query_params.get("search", "").strip()
+        discipline = request.query_params.get("discipline", "").strip()
+        bouquet_id = request.query_params.get("bouquet_id", "").strip()
+
+        qs = Ouvrage.objects.filter(
+            id__in=accessible_ids,
+            status='published'
+        ).select_related('discipline', 'institution').prefetch_related('authors')
+
+        if search:
+            qs = qs.filter(Q(title__icontains=search) | Q(auteur__icontains=search) | Q(isbn__icontains=search))
+        if discipline:
+            qs = qs.filter(discipline__name__icontains=discipline)
+        if bouquet_id:
+            # Filtrer aux seuls ouvrages du bouquet demandé
+            try:
+                offering = BouquetOffering.objects.get(id=bouquet_id)
+                bouquet_book_ids = set(offering.get_books_queryset(requesting_institution=inst).values_list('id', flat=True))
+                qs = qs.filter(id__in=bouquet_book_ids)
+            except BouquetOffering.DoesNotExist:
+                pass
+
+        books = []
+        for book in qs.order_by('title')[:200]:
+            cover_url = ""
+            if book.cover_image:
+                try:
+                    cover_url = book.cover_image.url
+                except Exception:
+                    cover_url = str(book.cover_image)
+
+            authors = [
+                a.user.get_full_name() if (a.user and a.user.get_full_name()) else f"{a.first_name} {a.last_name}".strip()
+                for a in book.authors.all()
+            ] if hasattr(book, 'authors') else []
+            if not authors and book.auteur:
+                authors = [book.auteur]
+
+            books.append({
+                "id": str(book.id),
+                "title": book.title,
+                "authors": authors,
+                "isbn": book.isbn or "",
+                "cover_url": cover_url,
+                "discipline": book.discipline.name if book.discipline else "",
+                "institution_name": book.institution.name if book.institution else "",
+                "summary": (book.summary or "")[:300],
+                "publication_year": book.publication_year if hasattr(book, 'publication_year') else None,
+                "is_audio_available": getattr(book, 'is_audio_available', False),
+                "bouquets": bouquet_map.get(str(book.id), []),
+            })
+
+        logger.info(f"[UNIV CATALOG] {timezone.now().isoformat()} - CLIENT {inst.code}: {len(books)} ouvrages accessibles retournés")
+
+        return Response({"success": True, "data": books, "error": None})
+
+
+class UniversityPostPaymentCredentialsView(APIView):
+    """
+    GET /api/v1/partners/university/subscriptions/<uuid:pk>/credentials/
+    Restitue les identifiants d'API post-paiement, avec le secret en clair s'il vient d'être créé
+    (disponible dans le cache sécurisé pendant 15 minutes), et le contenu formaté du fichier .env.
+    """
+    permission_classes = [permissions.IsAuthenticated, IsUniversityStaff]
+
+    def get(self, request, pk):
+        import logging
+        from django.core.cache import cache
+        from apps.reader.models import PartnerApp
+
+        logger = logging.getLogger(__name__)
+        user = request.user
+        inst = get_user_institution(user)
+
+        if not inst and getattr(user, 'role', '') not in ['admin', 'super_admin']:
+            return Response({"success": False, "error": "Université introuvable."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Récupération de la souscription
+        sub_qs = UniversityBouquetSubscription.objects.filter(id=pk)
+        if inst and getattr(user, 'role', '') not in ['admin', 'super_admin']:
+            sub_qs = sub_qs.filter(institution=inst)
+        sub = sub_qs.first()
+
+        if not sub:
+            return Response({"success": False, "error": "Souscription bouquet introuvable."}, status=status.HTTP_404_NOT_FOUND)
+
+        institution = sub.institution or inst
+
+        # Lecture dans le cache sécurisé (TTL 15 minutes)
+        cache_key = f"post_payment_credentials_{sub.id}"
+        cached = cache.get(cache_key)
+
+        partner = PartnerApp.objects.filter(linked_institution=institution).first()
+
+        if cached:
+            client_id = cached.get("client_id")
+            client_secret = cached.get("client_secret")
+            client_secret_last4 = cached.get("client_secret_last4") or (partner.client_secret_last4 if partner else "")
+            is_new = cached.get("created", False)
+            env_content = cached.get("env_content")
+        elif partner:
+            client_id = partner.client_id
+            client_secret = None
+            client_secret_last4 = partner.client_secret_last4
+            is_new = False
+            env_content = (
+                f"# LAHAThèque API Credentials - {institution.name}\n"
+                f"LAHATHEQUE_CLIENT_ID={partner.client_id}\n"
+                f"LAHATHEQUE_CLIENT_SECRET=••••••••••••••••••••••••••••••••\n"
+                f"LAHATHEQUE_API_URL=https://api.lahatheque.com/api/v1\n"
+            )
+        else:
+            client_id = None
+            client_secret = None
+            client_secret_last4 = None
+            is_new = False
+            env_content = ""
+
+        inst_code_safe = institution.code.lower() if (institution and institution.code) else "partner"
+        filename = f"lahatheque-api-credentials-{inst_code_safe}.txt"
+
+        logger.info(f"[POST PAYMENT CREDENTIALS] Consulté pour souscription {sub.id} (nouveau={is_new})")
+
+        return Response({
+            "success": True,
+            "data": {
+                "subscription_id": str(sub.id),
+                "institution_name": institution.name if institution else "",
+                "institution_code": institution.code if institution else "",
+                "offering_title": sub.title,
+                "subscription_period": sub.subscription_period,
+                "price_paid": float(sub.price_paid or sub.annual_price or 0.0),
+                "currency": sub.currency,
+                "start_date": str(sub.start_date) if sub.start_date else None,
+                "end_date": str(sub.end_date) if sub.end_date else None,
+                "status": sub.status,
+                "client_id": client_id,
+                "client_secret": client_secret,
+                "client_secret_last4": client_secret_last4,
+                "is_new": is_new,
+                "env_content": env_content,
+                "suggested_filename": filename,
+                "guide_pdf_url": "/api/v1/partners/university/guides/catalog-only-pdf/",
+            },
+            "error": None
+        })
+
+
+class PartnerGuidePdfDownloadView(APIView):
+    """
+    GET /api/v1/partners/university/guides/catalog-only-pdf/
+    Génère et télécharge le Guide d'Implémentation Partenaire officiel en PDF vectoriel haute définition.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        from django.http import HttpResponse
+        from apps.reporting.pdf_service import PartnerIntegrationGuidePdfService
+        try:
+            pdf_bytes = PartnerIntegrationGuidePdfService.generate_guide_pdf()
+            response = HttpResponse(pdf_bytes, content_type='application/pdf')
+            response['Content-Disposition'] = 'attachment; filename="Guide_Integration_Catalogue_LAHATheque.pdf"'
+            response['Content-Length'] = len(pdf_bytes)
+            return response
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Erreur lors de la génération du guide PDF partenaire: {e}", exc_info=True)
+            return Response({
+                "success": False,
+                "error": f"Impossible de générer le guide PDF: {str(e)}"
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
 
 

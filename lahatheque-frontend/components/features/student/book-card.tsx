@@ -184,18 +184,28 @@ export function BookCard({ book, onToggleFavorite, className }: BookCardProps) {
                     <span className="truncate">{book.institution_name}</span>
                   </span>
                 )}
-                {book.access_type === "institution_bundle" && (
+                {book.is_bouquet_book ? (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-navy bg-gold/15 px-2 py-0.5 rounded-md border border-gold/30 shrink-0">
+                    <Sparkles className="w-3 h-3 text-gold" />
+                    <span>{book.bouquet_name || "Bouquet Campus"}</span>
+                  </span>
+                ) : book.access_type === "institution_bundle" ? (
                   <span className="inline-flex items-center gap-1 text-[10px] font-bold text-navy bg-gold/15 px-2 py-0.5 rounded-md border border-gold/30 shrink-0">
                     <Sparkles className="w-3 h-3 text-gold" />
                     Bouquet Campus
                   </span>
-                )}
-                {((book.expires_in_days !== undefined && book.expires_in_days !== null) || book.expiresInDays !== undefined) && (
+                ) : null}
+                {book.is_bouquet_book && book.bouquet_end_date ? (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-medium text-navy bg-gold/10 px-2 py-0.5 rounded-md border border-gold/25 shrink-0">
+                    <Clock className="w-3 h-3 text-gold shrink-0" />
+                    <span>Expire le {new Date(book.bouquet_end_date).toLocaleDateString("fr-FR")}</span>
+                  </span>
+                ) : ((book.expires_in_days !== undefined && book.expires_in_days !== null) || book.expiresInDays !== undefined) ? (
                   <span className="inline-flex items-center gap-1 text-[10px] font-medium text-navy bg-navy/5 px-2 py-0.5 rounded-md border border-border shrink-0">
                     <Clock className="w-3 h-3 text-gold shrink-0" />
                     <span>Accès 12 mois ({book.expires_in_days ?? book.expiresInDays} j restants)</span>
                   </span>
-                )}
+                ) : null}
               </div>
             </div>
           </div>

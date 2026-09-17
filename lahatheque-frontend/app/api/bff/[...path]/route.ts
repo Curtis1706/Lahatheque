@@ -62,18 +62,25 @@ async function handleProxy(request: NextRequest, { params }: { params: Promise<{
     headers.set('x-reader-token', readerToken)
   }
 
-  // Transmission explicite du Cookie et du Bearer pour Django
-  if (accessToken) {
-    headers.set('authorization', `Bearer ${accessToken}`)
-    headers.set('cookie', `laha_access=${accessToken}`)
-  } else if (authHeader) {
-    headers.set('authorization', authHeader)
+  const readerDeviceToken = request.headers.get('x-reader-device-token')
+  if (readerDeviceToken) {
+    headers.set('x-reader-device-token', readerDeviceToken)
   }
 
-  // Transmission du cookie brut de la requête si présent
-  const rawCookie = request.headers.get('cookie')
-  if (rawCookie && !headers.has('cookie')) {
+  // Transmission exhaustive des cookies (y compris laha_reader_bind_* pour le verrouillage de session)
+  const rawCookie = request.headers.get('cookie') || ''
+  if (rawCookie) {
     headers.set('cookie', rawCookie)
+  }
+  if (accessToken && !rawCookie.includes('laha_access=')) {
+    const separator = rawCookie ? '; ' : ''
+    headers.set('cookie', `${rawCookie}${separator}laha_access=${accessToken}`)
+  }
+
+  if (accessToken) {
+    headers.set('authorization', `Bearer ${accessToken}`)
+  } else if (authHeader) {
+    headers.set('authorization', authHeader)
   }
 
   const isReaderSessionRoute = cleanSubPath.startsWith('reader/')
@@ -85,17 +92,32 @@ async function handleProxy(request: NextRequest, { params }: { params: Promise<{
   if (request.method !== 'GET' && request.method !== 'HEAD') {
     try {
       if (contentType && contentType.includes('multipart/form-data')) {
-        // Pour les uploads multipart, lire le Buffer complet et définir le Content-Length exact requis par WSGI/Django
+        // Pour les uploads multipart, lire le Buffer complet
         const arrayBuffer = await request.arrayBuffer()
         body = Buffer.from(arrayBuffer)
-        headers.set('content-length', String(body.byteLength))
-        console.log(`[BFF Proxy] Multipart reçu (${(body.byteLength / (1024 * 1024)).toFixed(2)} Mo) -> transmission avec Content-Length vers ${targetUrl}`)
+        console.log(`[BFF Proxy] Multipart reçu (${(body.byteLength / (1024 * 1024)).toFixed(2)} Mo) -> transmission vers ${targetUrl}`)
       } else {
         body = await request.text()
       }
     } catch (readErr) {
       console.error(`[BFF Proxy ERROR] Erreur lecture du body :`, readErr)
       body = undefined
+    }
+  }
+
+  // Conversion en objet plain pour contourner les restrictions WHATWG Forbidden Headers sur Content-Length
+  const proxyHeaders: Record<string, string> = {}
+  headers.forEach((val, key) => {
+    if (key.toLowerCase() !== 'transfer-encoding') {
+      proxyHeaders[key.toLowerCase()] = val
+    }
+  })
+
+  if (body) {
+    if (Buffer.isBuffer(body)) {
+      proxyHeaders['content-length'] = String(body.byteLength)
+    } else if (typeof body === 'string') {
+      proxyHeaders['content-length'] = String(Buffer.byteLength(body, 'utf-8'))
     }
   }
 
@@ -112,14 +134,12 @@ async function handleProxy(request: NextRequest, { params }: { params: Promise<{
 
     const fetchOptions: RequestInit = {
       method: request.method,
-      headers: headers,
+      headers: proxyHeaders,
       body: body || undefined,
       cache: 'no-store',
       signal: fetchController.signal,
-    }
-    if (body && typeof (body as any).getReader === 'function') {
       // @ts-ignore
-      fetchOptions.duplex = 'half'
+      duplex: 'half',
     }
 
     try {
@@ -180,6 +200,11 @@ async function handleProxy(request: NextRequest, { params }: { params: Promise<{
       forwardHeaders.set('cache-control', 'private, no-store, must-revalidate')
       forwardHeaders.set('x-content-type-options', 'nosniff')
 
+      const binarySetCookies = (backendRes.headers as any).getSetCookie
+        ? (backendRes.headers as any).getSetCookie()
+        : [backendRes.headers.get('set-cookie')].filter(Boolean)
+      binarySetCookies.forEach((c: string) => forwardHeaders.append('set-cookie', c))
+
       return new Response(backendRes.body, {
         status: backendRes.status,
         headers: forwardHeaders,
@@ -203,7 +228,12 @@ async function handleProxy(request: NextRequest, { params }: { params: Promise<{
       console.log(`[BFF Proxy] ${request.method} /${cleanSubPath} -> HTTP ${backendRes.status}`)
     }
 
-    return NextResponse.json(jsonData, { status: backendRes.status })
+    const jsonRes = NextResponse.json(jsonData, { status: backendRes.status })
+    const jsonSetCookies = (backendRes.headers as any).getSetCookie
+      ? (backendRes.headers as any).getSetCookie()
+      : [backendRes.headers.get('set-cookie')].filter(Boolean)
+    jsonSetCookies.forEach((c: string) => jsonRes.headers.append('set-cookie', c))
+    return jsonRes
   } catch (error) {
     console.error(`[BFF Proxy Error] ${request.method} ${targetUrl}:`, error)
     return NextResponse.json(

@@ -168,9 +168,9 @@ export default async function HomePage() {
         <div className="max-w-7xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8">
           <div>
             <span className="block text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-serif text-gold font-bold mb-1.5 tracking-tight">
-              +<CountingNumber target={20000} />
+              +<CountingNumber target={25} />
             </span>
-            <span className="text-[10px] md:text-xs font-bold uppercase tracking-wider text-white/70">Ouvrages disponibles</span>
+            <span className="text-[10px] md:text-xs font-bold uppercase tracking-wider text-white/70">Disciplines académiques</span>
           </div>
           <div>
             <span className="block text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-serif text-gold font-bold mb-1.5 tracking-tight">

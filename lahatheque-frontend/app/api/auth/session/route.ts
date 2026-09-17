@@ -110,6 +110,9 @@ function setUiCookie(response: NextResponse, userData: any, accessToken?: string
     teacher_profile: userData.teacher_profile || null,
     author_profile: userData.author_profile || null,
     has_active_family_subscription: !!userData.has_active_family_subscription,
+    // Profil institution : expose institution_type pour la sidebar (masquage conditionnel)
+    institution_detail: userData.institution_detail || null,
+    university_profile: userData.university_profile || userData.institution_detail || null,
     // Timestamp Unix de l'expiration du token d'accès — pas un secret, juste une horloge.
     // Permet au client de planifier le refresh proactif sur le vrai exp.
     access_expires_at: accessExpiresAt,

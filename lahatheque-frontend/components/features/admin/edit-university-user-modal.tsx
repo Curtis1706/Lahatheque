@@ -46,6 +46,8 @@ export function EditUniversityUserModal({
   const [newInstCode, setNewInstCode] = useState("");
   const [newInstCountry, setNewInstCountry] = useState("BJ");
   const [newInstRate, setNewInstRate] = useState<number>(15.0);
+  // T020 : Type d'institution pour nouvelle création via la modale d'édition
+  const [newInstType, setNewInstType] = useState<'partner' | 'client'>('client');
 
   const [overrideRate, setOverrideRate] = useState<number | "">("");
   const [showRateOverride, setShowRateOverride] = useState(false);
@@ -122,6 +124,7 @@ export function EditUniversityUserModal({
         payload.institution_royalty_rate = newInstRate;
       }
 
+      console.info("[ADMIN INSTITUTION]", new Date().toISOString(), "- Mise à jour compte universitaire :", user.id, payload);
       const res = await updateAdminUser(user.id, payload);
       if (res.success) {
         toast.success("Compte universitaire mis à jour avec succès.");
@@ -155,6 +158,12 @@ export function EditUniversityUserModal({
     instDetail?.name || (user as any).institution_name || user.extra_info?.institution_name;
   const currentInstCode = instDetail?.code;
   const currentRate = instDetail?.royalty_rate ?? 15.0;
+  const currentInstType: 'partner' | 'client' = instDetail?.institution_type || 'partner';
+
+  // T020 : Vérouillage des 4 partenaires historiques
+  const LOCKED_CODES = new Set(['UAC', 'UP', 'UNSTIM', 'UNA']);
+  const isLockedInstitution = currentInstCode && LOCKED_CODES.has(currentInstCode.toUpperCase());
+  const isClientType = currentInstType === 'client';
 
   return (
     <Modal open={isOpen} onClose={onClose} title="Modifier le Compte Université">
@@ -165,19 +174,41 @@ export function EditUniversityUserModal({
             <div className="w-9 h-9 rounded-xl bg-navy flex items-center justify-center shrink-0">
               <Building2 className="w-4 h-4 text-white" />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
                 <p className="text-xs font-bold text-navy">{currentInstName}</p>
                 {currentInstCode && (
                   <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-gold/10 border border-gold/20 text-gold">
                     {currentInstCode}
                   </span>
                 )}
+                {/* T020 : Badge institution_type */}
+                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${
+                  currentInstType === 'partner'
+                    ? 'bg-gold/10 border-gold/20 text-gold'
+                    : 'bg-navy/5 border-navy/20 text-navy'
+                }`}>
+                  {currentInstType === 'partner' ? 'Partenaire' : 'Cliente'}
+                </span>
+                {/* T020 : Badge verrou pour les 4 historiques */}
+                {isLockedInstitution && (
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-error/10 border border-error/20 text-error flex items-center gap-1">
+                    <AlertTriangle className="w-3 h-3" />
+                    Verrouillé
+                  </span>
+                )}
               </div>
-              <p className="text-[11px] text-foreground-muted">
-                Taux actuel :{" "}
-                <span className="font-bold text-gold font-mono">{currentRate}%</span>
-              </p>
+              {!isLockedInstitution && (
+                <p className="text-[11px] text-foreground-muted">
+                  Taux actuel :{" "}
+                  <span className="font-bold text-gold font-mono">{currentRate}%</span>
+                </p>
+              )}
+              {isLockedInstitution && (
+                <p className="text-[11px] text-error/80 mt-0.5">
+                  Institution fondatrice — statut Partenaire inviolable (T018).
+                </p>
+              )}
             </div>
           </div>
         )}
@@ -382,24 +413,58 @@ export function EditUniversityUserModal({
                   </select>
                 </div>
               </div>
+
+              {/* T020 : Sélecteur type d'institution pour nouvelle création */}
               <div>
-                <label className="text-[11px] font-medium text-foreground flex items-center gap-1">
-                  <Percent className="w-3 h-3 text-gold" />
-                  Taux de redevance (%)
-                </label>
-                <div className="flex items-center gap-2 mt-1">
-                  <input
-                    type="number"
-                    min={1}
-                    max={50}
-                    step={0.5}
-                    value={newInstRate}
-                    onChange={(e) => setNewInstRate(Number(e.target.value))}
-                    className="w-28 p-2.5 text-xs rounded-xl bg-background border border-border focus:border-gold focus:outline-none font-mono"
-                  />
-                  <span className="text-xs text-foreground-muted">% (standard : 15%)</span>
+                <label className="text-[11px] font-medium text-foreground">Type d&apos;institution *</label>
+                <div className="flex gap-2 mt-1">
+                  <button
+                    type="button"
+                    onClick={() => setNewInstType('client')}
+                    className={`flex-1 py-2 rounded-xl text-xs font-semibold border transition-colors ${
+                      newInstType === 'client'
+                        ? 'bg-navy text-white border-navy'
+                        : 'bg-background border-border text-foreground-muted hover:border-navy'
+                    }`}
+                  >
+                    Cliente
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setNewInstType('partner')}
+                    className={`flex-1 py-2 rounded-xl text-xs font-semibold border transition-colors ${
+                      newInstType === 'partner'
+                        ? 'bg-gold text-navy border-gold'
+                        : 'bg-background border-border text-foreground-muted hover:border-gold'
+                    }`}
+                  >
+                    Partenaire
+                  </button>
                 </div>
               </div>
+
+              {/* T020 : Taux uniquement pour les partenaires */}
+              {newInstType === 'partner' && (
+                <div>
+                  <label className="text-[11px] font-medium text-foreground flex items-center gap-1">
+                    <Percent className="w-3 h-3 text-gold" />
+                    Taux de redevance (%)
+                  </label>
+                  <div className="flex items-center gap-2 mt-1">
+                    <input
+                      type="number"
+                      min={1}
+                      max={50}
+                      step={0.5}
+                      value={newInstRate}
+                      onChange={(e) => setNewInstRate(Number(e.target.value))}
+                      className="w-28 p-2.5 text-xs rounded-xl bg-background border border-border focus:border-gold focus:outline-none font-mono"
+                    />
+                    <span className="text-xs text-foreground-muted">% (standard : 15%)</span>
+                  </div>
+                </div>
+              )}
+
               <div className="flex items-center gap-1.5 p-2 rounded-lg bg-gold/10 border border-gold/20 text-[10px] text-navy">
                 <AlertTriangle className="w-3 h-3 text-gold shrink-0" />
                 <span>

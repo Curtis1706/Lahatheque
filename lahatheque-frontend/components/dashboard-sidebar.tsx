@@ -107,7 +107,7 @@ export function DashboardSidebar() {
               { label: "Espace Client", href: "/student", icon: <LayoutDashboard className="size-4" /> },
               { label: "Catalogue & Recherche", href: "/student/catalog", icon: <Search className="size-4" /> },
               { label: "Ma Bibliothèque", href: "/student/books", icon: <BookOpen className="size-4" /> },
-              // { label: "Bouquets Documentaires", href: "/student/bouquets", icon: <Layers className="size-4" /> },
+              { label: "Bouquets Documentaires", href: "/student/bouquets", icon: <Layers className="size-4" /> },
               { label: "Achats & Commandes", href: "/student/orders", icon: <PackageCheck className="size-4" /> },
               // { label: "Historique & Stats", href: "/student/history", icon: <History className="size-4" /> },
               // Désactivé conformément au CDC v3.2 (le Client souscrit directement aux
@@ -142,24 +142,47 @@ export function DashboardSidebar() {
           },
         ];
 
-      case "university":
+      case "university": {
+        // Résolution du type d'institution depuis le cookie UI ou les codes partenaires historiques (UAC, UP, UNSTIM, UNA)
+        const instDetail =
+          (user as any)?.institution_detail ||
+          (user as any)?.university_profile ||
+          (user as any)?.institution ||
+          null;
+        const instCode = (instDetail?.code || (user as any)?.institution_code || "").toUpperCase();
+        const instName = ((instDetail?.name || (user as any)?.institution_name || "") as string).toUpperCase();
+        const isHistoricalPartner =
+          ["UAC", "UP", "UNSTIM", "UNA"].includes(instCode) ||
+          instName.includes("ABOMEY") ||
+          instName.includes("UAC") ||
+          (user?.email || "").toLowerCase().includes("universite@lahatheque.com");
+        const resolvedType =
+          instDetail?.institution_type ||
+          (user as any)?.institution_type ||
+          (isHistoricalPartner ? "partner" : null);
+
+        const isPartner = resolvedType === "partner" || isHistoricalPartner;
+        const isClient = resolvedType === "client";
+
+        const universityItems: NavLinkItem[] = [
+          { label: "Vue d'ensemble", href: "/university", icon: <LayoutDashboard className="size-4" /> },
+          // Bouquets masqués pour les partenaires (ils ne souscrivent pas d'abonnements)
+          ...(!isPartner ? [{ label: "Bouquets Documentaires", href: "/university/bouquets", icon: <Sparkles className="size-4" /> }] : []),
+          // Commandes masquées pour les partenaires (réservé aux universités clientes acheteuses de stock papier)
+          ...(!isPartner ? [{ label: "Commandes", href: "/university/purchases", icon: <PackageCheck className="size-4" /> }] : []),
+          // Redevances masquées pour les universités clientes
+          ...(!isClient ? [{ label: "Redevances", href: "/university/royalties", icon: <DollarSign className="size-4" /> }] : []),
+          { label: "Profil & Paramètres", href: "/university/profile", icon: <Building2 className="size-4" /> },
+        ];
+
         return [
           {
-            groupLabel: "Espace Université",
-            items: [
-              { label: "Vue d'ensemble", href: "/university", icon: <LayoutDashboard className="size-4" /> },
-              { label: "Bouquets Documentaires", href: "/university/bouquets", icon: <Sparkles className="size-4" /> },
-              { label: "Catalogue Universitaire", href: "/university/catalog", icon: <BookOpen className="size-4" /> },
-              // Masqué temporairement à la demande utilisateur :
-              // { label: "Statistiques & Usage", href: "/university/stats", icon: <FileBarChart className="size-4" /> },
-              // Désactivé conformément au CDC v3.2 — voir Fiches X1-X4.
-              // { label: "Affiliations Étudiants", href: "/university/affiliations", icon: <GraduationCap className="size-4" /> },
-              { label: "Commandes", href: "/university/purchases", icon: <PackageCheck className="size-4" /> },
-              { label: "Redevances", href: "/university/royalties", icon: <DollarSign className="size-4" /> },
-              { label: "Profil & Paramètres", href: "/university/profile", icon: <Building2 className="size-4" /> },
-            ],
+            groupLabel: isPartner ? "Université Partenaire" : "Université Cliente",
+            items: universityItems,
           },
         ];
+      }
+
 
       case "manager":
         return [

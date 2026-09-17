@@ -66,8 +66,11 @@ export default function ChiefLayoutCatalogPage() {
     loadData();
   }, [loadData]);
 
-  // Statistiques KPIs calculées sur l'intégralité du catalogue
-  const totalCount = books.length;
+  // Statistiques KPIs spécifiques à l'atelier maquette
+  const audioCount = useMemo(
+    () => books.filter((b) => Boolean(b.has_audio_version || (b as any).has_audio || b.price_audio)).length,
+    [books]
+  );
   const publishedCount = useMemo(
     () => books.filter((b) => b.status === "published").length,
     [books]
@@ -267,13 +270,14 @@ export default function ChiefLayoutCatalogPage() {
       {/* Cartes de KPIs Réels */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
         <div className="p-4 rounded-2xl bg-background border border-border space-y-1 shadow-xs">
-          <span className="text-[11px] font-bold text-foreground-muted uppercase tracking-wider">
-            Total Ouvrages
+          <span className="text-[11px] font-bold text-navy uppercase tracking-wider flex items-center gap-1">
+            <Headphones className="w-3.5 h-3.5 text-gold" />
+            Versions Audio
           </span>
           <p className="text-xl sm:text-2xl font-serif font-bold text-navy">
-            {totalCount.toLocaleString("fr-FR")}
+            {audioCount.toLocaleString("fr-FR")}
           </p>
-          <span className="text-[10px] text-foreground-muted">Au catalogue global</span>
+          <span className="text-[10px] text-foreground-muted">Pistes associées</span>
         </div>
 
         <div className="p-4 rounded-2xl bg-background border border-border space-y-1 shadow-xs">

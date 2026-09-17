@@ -12,13 +12,15 @@ import {
   getAIRoyaltySuggestions, 
   getClientDebts,
   validateAISuggestion,
-  remindClientDebt
+  remindClientDebt,
+  getPendingPublicationBooks
 } from "@/lib/services/legal";
 import type { 
   LegalKpis, 
   LegalContract, 
   AIRoyaltySuggestion, 
-  ClientDebt 
+  ClientDebt,
+  PendingPublicationBook
 } from "@/lib/types/legal";
 import {
   Scale,
@@ -42,7 +44,10 @@ import {
   Layers,
   Activity,
   ShieldAlert,
-  ArrowUpRight
+  ArrowUpRight,
+  BookOpenCheck,
+  ExternalLink,
+  RefreshCw
 } from "lucide-react";
 
 import { ContractConsultationModal } from "@/components/features/legal/contract-consultation-modal";
@@ -53,6 +58,7 @@ export default function LegalReviewerOverviewPage() {
   const [contracts, setContracts] = useState<LegalContract[]>([]);
   const [aiSuggestions, setAiSuggestions] = useState<AIRoyaltySuggestion[]>([]);
   const [debts, setDebts] = useState<ClientDebt[]>([]);
+  const [pendingBooks, setPendingBooks] = useState<PendingPublicationBook[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
 
@@ -68,16 +74,18 @@ export default function LegalReviewerOverviewPage() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [kpiData, contractData, sugData, debtData] = await Promise.all([
+      const [kpiData, contractData, sugData, debtData, pendingData] = await Promise.all([
         getLegalKpis(),
         getLegalContracts(),
         getAIRoyaltySuggestions(),
         getClientDebts(),
+        getPendingPublicationBooks(),
       ]);
       setKpis(kpiData);
       setContracts(contractData.slice(0, 5));
       setAiSuggestions(sugData);
       setDebts(debtData);
+      setPendingBooks(pendingData);
     } catch (err) {
       console.error("Erreur de chargement du dashboard juriste", err);
     } finally {
@@ -92,7 +100,7 @@ export default function LegalReviewerOverviewPage() {
   const handleValidateSuggestion = async (id: string) => {
     const success = await validateAISuggestion(id);
     if (success) {
-      setActionMessage("Clé de répartition IA validée avec succès !");
+      setActionMessage("Répartition validée avec succès !");
       setTimeout(() => setActionMessage(null), 4000);
       loadData();
     }
@@ -157,7 +165,20 @@ export default function LegalReviewerOverviewPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2.5 shrink-0 flex-wrap">
+          <Link
+            href="/legal-reviewer/publication-en-attente"
+            className="px-4 py-2.5 rounded-xl bg-background-secondary/90 hover:bg-background border border-gold/40 text-gold font-bold text-xs transition-all flex items-center gap-2 shadow-xs min-h-[44px]"
+          >
+            <BookOpenCheck className="w-4 h-4 text-gold" />
+            <span>Dépôts Maquettiste</span>
+            {pendingBooks.length > 0 && (
+              <span className="px-1.5 py-0.5 rounded-full bg-gold text-navy text-[10px] font-bold">
+                {pendingBooks.length}
+              </span>
+            )}
+          </Link>
+
           <Link
             href="/legal-reviewer/contracts/new"
             className="px-4 py-2.5 rounded-xl bg-gold text-navy font-bold text-xs hover:bg-gold-hover transition-all flex items-center gap-2 shadow-sm min-h-[44px]"
@@ -178,8 +199,21 @@ export default function LegalReviewerOverviewPage() {
         </div>
       )}
 
-      {/* 4 KPI Cards en Barres Histogrammes (Full Width Responsive Grid) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 xl:grid-cols-4 gap-5">
+      {/* 6 KPI Cards en Barres Histogrammes (Full Width Responsive Grid) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
+        <Link href="/legal-reviewer/publication-en-attente" className="block">
+          <ProgressMetricCard
+            title="Dépôts Maquettiste"
+            total={`${pendingBooks.length} ouvrage(s)`}
+            percent={pendingBooks.length > 0 ? "À valider" : "À jour"}
+            trend="up"
+            accent="gold"
+            delta={`${pendingBooks.filter(b => b.has_active_contract).length} prêt(s)`}
+            deltaLabel="pour vitrine"
+            data={kpis?.timeline || []}
+          />
+        </Link>
+
         <Link href="/legal-reviewer/contracts" className="block">
           <ProgressMetricCard
             title="Contrats Stockés"
@@ -189,6 +223,19 @@ export default function LegalReviewerOverviewPage() {
             accent="gold"
             delta={`${kpis?.totalContracts ?? contracts.length} contrat(s)`}
             deltaLabel="enregistrés"
+            data={kpis?.timeline || []}
+          />
+        </Link>
+
+        <Link href="/legal-reviewer/royalties?tab=suggestions" className="block">
+          <ProgressMetricCard
+            title="Propositions de Répartition"
+            total={`${kpis?.pendingAiSuggestions ?? aiSuggestions.length} en attente`}
+            percent={aiSuggestions.length > 0 ? "À arbitrer" : "À jour"}
+            trend="up"
+            accent="gold"
+            delta={`${aiSuggestions.length} proposition(s)`}
+            deltaLabel="à valider"
             data={kpis?.timeline || []}
           />
         </Link>
@@ -251,7 +298,7 @@ export default function LegalReviewerOverviewPage() {
               </span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-1">
               {/* Jauge 1 : Couverture Contrats Auteurs */}
               <div className="space-y-2 bg-background p-4 rounded-2xl border border-border">
                 <div className="flex items-center justify-between text-xs font-bold">
@@ -269,23 +316,135 @@ export default function LegalReviewerOverviewPage() {
                 </p>
               </div>
 
-              {/* Jauge 2 : Taux de Recouvrement Impayés */}
+              {/* Jauge 2 : Dépôts Chef Maquettiste & Contrats Actifs */}
               <div className="space-y-2 bg-background p-4 rounded-2xl border border-border">
                 <div className="flex items-center justify-between text-xs font-bold">
                   <span className="text-navy flex items-center gap-1.5">
-                    <AlertTriangle className="w-4 h-4 text-warning" /> Recouvrement
+                    <BookOpenCheck className="w-4 h-4 text-gold" /> Dépôts Maquettiste
                   </span>
-                  <span className="text-warning font-bold">78%</span>
+                  <span className="text-gold font-bold">
+                    {pendingBooks.length > 0
+                      ? `${Math.round((pendingBooks.filter(b => b.has_active_contract).length / pendingBooks.length) * 100)}%`
+                      : "100%"}
+                  </span>
                 </div>
                 <div className="w-full h-2.5 rounded-full bg-background-secondary overflow-hidden border border-border">
-                  <div className="h-full bg-warning rounded-full transition-all duration-500" style={{ width: "78%" }} />
+                  <div
+                    className="h-full bg-gold rounded-full transition-all duration-500"
+                    style={{
+                      width: pendingBooks.length > 0
+                        ? `${Math.round((pendingBooks.filter(b => b.has_active_contract).length / pendingBooks.length) * 100)}%`
+                        : "100%",
+                    }}
+                  />
                 </div>
                 <p className="text-[10px] text-foreground-muted flex justify-between">
-                  <span>1.070.000 FCFA</span>
-                  <span className="font-semibold text-foreground-muted">2 relances</span>
+                  <span>{pendingBooks.filter(b => b.has_active_contract).length} sur {pendingBooks.length} prêts</span>
+                  <span className="font-semibold text-navy">
+                    {pendingBooks.filter(b => !b.has_active_contract).length} sans contrat
+                  </span>
+                </p>
+              </div>
+
+              {/* Jauge 3 : Validation des Répartitions Suggérées */}
+              <div className="space-y-2 bg-background p-4 rounded-2xl border border-border">
+                <div className="flex items-center justify-between text-xs font-bold">
+                  <span className="text-navy flex items-center gap-1.5">
+                    <Sparkles className="w-4 h-4 text-info" /> Propositions Traitées
+                  </span>
+                  <span className="text-info font-bold">85%</span>
+                </div>
+                <div className="w-full h-2.5 rounded-full bg-background-secondary overflow-hidden border border-border">
+                  <div className="h-full bg-info rounded-full transition-all duration-500" style={{ width: "85%" }} />
+                </div>
+                <p className="text-[10px] text-foreground-muted flex justify-between">
+                  <span>12 propositions validées</span>
+                  <span className="font-semibold text-info">2 en attente</span>
                 </p>
               </div>
             </div>
+          </div>
+
+          {/* NOUVEAU BLOC : Ouvrages envoyés par le Chef Maquettiste à valider */}
+          <div className="p-6 rounded-3xl bg-background-secondary border border-border space-y-4 shadow-xs">
+            <div className="flex items-center justify-between border-b border-border pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-gold/15 text-gold">
+                  <BookOpenCheck className="w-4 h-4 text-gold" />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold font-serif text-navy">
+                    Ouvrages à Valider (Envoyés par le Chef Maquettiste)
+                  </h2>
+                  <p className="text-[11px] text-foreground-muted">
+                    Vérifiez la conformité contractuelle avant d&apos;autoriser la publication sur la vitrine officielle
+                  </p>
+                </div>
+              </div>
+              <Link
+                href="/legal-reviewer/publication-en-attente"
+                className="text-xs font-bold text-gold hover:text-gold-dark flex items-center gap-1 shrink-0"
+              >
+                Gérer ({pendingBooks.length}) <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
+
+            {loading ? (
+              <div className="h-40 w-full bg-border/40 animate-pulse rounded-2xl" />
+            ) : pendingBooks.length === 0 ? (
+              <div className="p-8 text-center bg-background rounded-2xl border border-border space-y-2">
+                <CheckCircle2 className="w-8 h-8 text-success mx-auto" />
+                <p className="text-xs font-bold text-navy">Aucun ouvrage en attente de validation</p>
+                <p className="text-[11px] text-foreground-muted">
+                  Tous les ouvrages transmis par le Chef Maquettiste ont déjà été examinés et autorisés à la publication.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {pendingBooks.slice(0, 4).map((book) => (
+                  <div
+                    key={book.id}
+                    className="p-3.5 sm:p-4 rounded-2xl bg-background border border-border hover:border-gold/40 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-10 h-13 rounded-lg bg-navy/10 border border-border flex items-center justify-center shrink-0 text-navy font-bold text-xs">
+                        <BookOpen className="w-4 h-4 text-gold" />
+                      </div>
+                      <div className="min-w-0">
+                        <h4 className="font-serif font-bold text-xs sm:text-sm text-navy truncate">
+                          {book.title}
+                        </h4>
+                        <p className="text-[11px] text-foreground-muted truncate">
+                          {book.authors?.length ? book.authors.join(", ") : "Auteur non spécifié"}
+                          {book.discipline && ` • ${book.discipline}`}
+                        </p>
+                        <div className="flex items-center gap-2 pt-1">
+                          {book.has_active_contract ? (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-success bg-success/10 px-2 py-0.5 rounded-full border border-success/20">
+                              <CheckCircle2 className="w-3 h-3" /> Contrat d&apos;édition actif
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-warning bg-warning/10 px-2 py-0.5 rounded-full border border-warning/20">
+                              <AlertTriangle className="w-3 h-3" /> Contrat manquant
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                      <Link
+                        href={`/legal-reviewer/publication-en-attente/${book.id}`}
+                        className="px-3.5 py-2 rounded-xl bg-navy text-gold hover:bg-navy-dark transition-colors font-bold text-[11px] flex items-center gap-1.5 border border-gold/30 shadow-xs cursor-pointer min-h-[38px]"
+                      >
+                        <ShieldCheck className="w-3.5 h-3.5 text-gold" />
+                        <span>Examiner &amp; Valider</span>
+                      </Link>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Tableau des Derniers Contrats Stockés */}
@@ -347,51 +506,107 @@ export default function LegalReviewerOverviewPage() {
             )}
           </div>
 
-          {/* Bloc Impayés Clients */}
-          <div className="p-6 rounded-3xl bg-background-secondary border border-border space-y-4 shadow-xs">
-            <div className="flex items-center justify-between border-b border-border pb-3">
-              <div className="flex items-center gap-2">
-                <div className="p-2 rounded-xl bg-rose-500/10 text-rose-600">
-                  <AlertTriangle className="w-4 h-4" />
+          {/* Grid à 2 blocs : Suggestions IA & Impayés */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            
+            {/* Bloc Propositions de Répartition */}
+            <div className="p-6 rounded-3xl bg-background-secondary border border-border space-y-4 shadow-xs">
+              <div className="flex items-center justify-between border-b border-border pb-3">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 rounded-xl bg-amber-500/10 text-amber-600">
+                    <Sparkles className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-bold font-serif text-navy">Propositions de Répartition</h3>
+                    <p className="text-[10px] text-foreground-muted">Quote-parts et taux d&apos;auteurs</p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-xs font-bold font-serif text-navy">Clients en Impayé</h3>
-                  <p className="text-[10px] text-foreground-muted">Relances échues</p>
-                </div>
+                <Link href="/legal-reviewer/royalties?tab=suggestions" className="text-[11px] font-bold text-gold">
+                  Voir tout ({aiSuggestions.length})
+                </Link>
               </div>
-              <Link href="/legal-reviewer/relances?tab=debts" className="text-[11px] font-bold text-gold">
-                Toutes ({debts.length})
-              </Link>
+
+              {loading ? (
+                <div className="h-28 w-full bg-border/40 animate-pulse rounded-2xl" />
+              ) : aiSuggestions.length === 0 ? (
+                <p className="text-xs text-foreground-muted py-4 text-center">Aucune proposition en attente.</p>
+              ) : (
+                <div className="space-y-3">
+                  {aiSuggestions.map((sug) => (
+                    <div key={sug.id} className="p-3.5 rounded-2xl bg-background border border-border space-y-2.5">
+                      <div className="flex items-start justify-between gap-2">
+                        <h4 className="font-bold text-xs text-navy leading-tight line-clamp-1">{sug.title}</h4>
+                        <span className="px-1.5 py-0.5 rounded bg-info/10 text-info font-bold text-[9px] shrink-0">
+                          {sug.ai_confidence}%
+                        </span>
+                      </div>
+                      <div className="space-y-1 text-[11px]">
+                        {sug.proposed_splits.map((split, i) => (
+                          <div key={i} className="flex justify-between text-foreground-muted">
+                            <span className="truncate">{split.author_name}</span>
+                            <span className="font-bold text-navy ml-2">{split.percentage}%</span>
+                          </div>
+                        ))}
+                      </div>
+                      <button
+                        onClick={() => handleValidateSuggestion(sug.id)}
+                        className="w-full py-1.5 px-2 rounded-xl bg-gold text-navy font-bold text-[11px] hover:bg-gold-hover transition-colors flex items-center justify-center gap-1 shadow-xs"
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5" /> Valider la répartition
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
-            {loading ? (
-              <div className="h-28 w-full bg-border/40 animate-pulse rounded-2xl" />
-            ) : debts.length === 0 ? (
-              <p className="text-xs text-foreground-muted py-4 text-center">Aucun impayé signalé.</p>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {debts.map((debt) => (
-                  <div key={debt.id} className="p-3.5 rounded-2xl bg-background border border-border space-y-2.5">
-                    <div className="flex items-start justify-between gap-2">
-                      <h4 className="font-bold text-xs text-navy leading-tight truncate">{debt.client_name}</h4>
-                      <span className="font-bold text-xs text-error font-mono shrink-0">
-                        {(debt.amount || debt.total_debt_amount || 0).toLocaleString("fr-FR")} {debt.currency}
-                      </span>
-                    </div>
-                    <div className="flex justify-between text-[10px] text-foreground-muted">
-                      <span>{debt.days_overdue}j de retard</span>
-                      <span>{debt.reminder_count} relance(s)</span>
-                    </div>
-                    <button
-                      onClick={() => handleRemindDebt(debt.id)}
-                      className="w-full py-1.5 px-2 rounded-xl bg-navy text-gold font-bold text-[11px] hover:bg-navy-dark transition-colors flex items-center justify-center gap-1 border border-gold/30 shadow-xs"
-                    >
-                      <Send className="w-3.5 h-3.5" /> Relancer Client
-                    </button>
+            {/* Bloc Impayés Clients */}
+            <div className="p-6 rounded-3xl bg-background-secondary border border-border space-y-4 shadow-xs">
+              <div className="flex items-center justify-between border-b border-border pb-3">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 rounded-xl bg-rose-500/10 text-rose-600">
+                    <AlertTriangle className="w-4 h-4" />
                   </div>
-                ))}
+                  <div>
+                    <h3 className="text-xs font-bold font-serif text-navy">Clients en Impayé</h3>
+                    <p className="text-[10px] text-foreground-muted">Relances échues</p>
+                  </div>
+                </div>
+                <Link href="/legal-reviewer/relances?tab=debts" className="text-[11px] font-bold text-gold">
+                  Toutes ({debts.length})
+                </Link>
               </div>
-            )}
+
+              {loading ? (
+                <div className="h-28 w-full bg-border/40 animate-pulse rounded-2xl" />
+              ) : debts.length === 0 ? (
+                <p className="text-xs text-foreground-muted py-4 text-center">Aucun impayé signalé.</p>
+              ) : (
+                <div className="space-y-3">
+                  {debts.map((debt) => (
+                    <div key={debt.id} className="p-3.5 rounded-2xl bg-background border border-border space-y-2.5">
+                      <div className="flex items-start justify-between gap-2">
+                        <h4 className="font-bold text-xs text-navy leading-tight truncate">{debt.client_name}</h4>
+                        <span className="font-bold text-xs text-error font-mono shrink-0">
+                          {(debt.amount || debt.total_debt_amount || 0).toLocaleString("fr-FR")} {debt.currency}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-[10px] text-foreground-muted">
+                        <span>{debt.days_overdue}j de retard</span>
+                        <span>{debt.reminder_count} relance(s)</span>
+                      </div>
+                      <button
+                        onClick={() => handleRemindDebt(debt.id)}
+                        className="w-full py-1.5 px-2 rounded-xl bg-navy text-gold font-bold text-[11px] hover:bg-navy-dark transition-colors flex items-center justify-center gap-1 border border-gold/30 shadow-xs"
+                      >
+                        <Send className="w-3.5 h-3.5" /> Relancer Client
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
           </div>
 
         </div>
@@ -403,17 +618,29 @@ export default function LegalReviewerOverviewPage() {
           <div className="p-6 rounded-3xl bg-background-secondary border border-border space-y-4 shadow-xs">
             <div className="pb-3 border-b border-border">
               <h2 className="text-base font-bold font-serif text-navy">Actions Rapides Juridiques</h2>
-              <p className="text-[11px] text-foreground-muted">Accès direct aux modules juridiques</p>
+              <p className="text-[11px] text-foreground-muted">Accès direct aux 7 sous-modules</p>
             </div>
 
             <div className="flex flex-col gap-2.5">
               {[
                 {
+                  label: "Valider Dépôts Maquettiste",
+                  desc: `${pendingBooks.length} ouvrage(s) à examiner pour vitrine`,
+                  icon: BookOpenCheck,
+                  href: "/legal-reviewer/publication-en-attente",
+                  primary: true,
+                },
+                {
                   label: "Téléverser un Contrat",
-                  desc: "Enregistrer un nouveau contrat PDF/Word",
+                  desc: "Enregistrer un nouveau contrat PDF officiel",
                   icon: PlusCircle,
                   href: "/legal-reviewer/contracts/new",
-                  primary: true,
+                },
+                {
+                  label: "Arbitrer les Répartitions",
+                  desc: "Quote-parts co-auteurs et taux proposés",
+                  icon: Sparkles,
+                  href: "/legal-reviewer/royalties?tab=suggestions",
                 },
                 {
                   label: "Nouveau Contrat Pré-édition",

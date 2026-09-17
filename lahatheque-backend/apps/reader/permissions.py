@@ -168,6 +168,24 @@ class IsValidReaderSession(BasePermission):
 
         try:
             session = ReaderTokenService.decode_and_validate_token(token_str)
+            # Contrôle anti-partage : vérification de l'empreinte de terminal liée
+            if isinstance(session.metadata, dict) and session.metadata.get("device_binding_hash"):
+                import hashlib
+                expected_hash = session.metadata["device_binding_hash"]
+                session_cookie_key = f"laha_reader_bind_{session.id}"
+                incoming_device_token = (
+                    request.headers.get("X-Reader-Device-Token")
+                    or request.COOKIES.get(session_cookie_key)
+                    or request.COOKIES.get("laha_reader_bind")
+                    or (request.data.get("device_binding_token") if hasattr(request, "data") and isinstance(request.data, dict) else None)
+                    or request.query_params.get("device_token")
+                )
+                if not incoming_device_token:
+                    return False
+                calc_hash = hashlib.sha256(str(incoming_device_token).strip().encode("utf-8")).hexdigest()
+                if calc_hash != expected_hash:
+                    return False
+
             request.reader_session = session
             request.partner = session.partner
             if hasattr(request, "_request"):

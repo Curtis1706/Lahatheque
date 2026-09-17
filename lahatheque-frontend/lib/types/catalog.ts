@@ -67,3 +67,22 @@ export interface OuvrageLanguageVersion extends LanguageVersionItem {
   ouvrage_id?: string;
 }
 
+export interface BouquetItem {
+  id: string;
+  title: string;
+  bouquet_type: "discipline" | "university" | "country" | "custom" | "general";
+  discipline?: string;
+  target_institution?: string | null;
+  country?: string;
+  books_count: number;
+  monthly_price: number;
+  annual_price: number;
+  currency: string;
+  description?: string;
+  is_active: boolean;
+  subscription_period?: "monthly" | "annual";
+  status?: "active" | "pending" | "expired" | "available";
+  start_date?: string;
+  end_date?: string;
+}
+

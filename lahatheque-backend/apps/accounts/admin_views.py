@@ -107,7 +107,12 @@ def send_custom_notification_email(recipient_email: str, recipient_name: str, su
 class StandardResultsSetPagination(PageNumberPagination):
     page_size = 20
     page_size_query_param = 'page_size'
-    max_page_size = 500
+    max_page_size = 10000
+
+    def paginate_queryset(self, queryset, request, view=None):
+        if request.query_params.get('all') in ('true', '1', 'True') or request.query_params.get('page_size') in ('all', '-1'):
+            return None
+        return super().paginate_queryset(queryset, request, view=view)
 
 
 class AdminUserManagementViewSet(viewsets.ViewSet):
@@ -242,12 +247,22 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
                             "error": f"L'institution '{existing_inst.name}' ({existing_inst.code}) existe déjà. Veuillez la sélectionner dans la liste des institutions partenaires existantes."
                         }, status=status.HTTP_400_BAD_REQUEST)
 
+                    # T017 : Résoudre le type d'institution depuis la requête admin
+                    # Valeurs acceptées : 'partner' | 'client' — défaut conservateur : 'client'
+                    requested_inst_type = str(data.get('institution_type', 'client')).lower()
+                    if requested_inst_type not in ('partner', 'client'):
+                        requested_inst_type = 'client'
+
+                    # T017 : Taux de redevance conditionnel au type d'institution
+                    royalty_rate_value = Decimal("15.00") if requested_inst_type == 'partner' else Decimal("0.00")
+
                     institution = Institution.objects.create(
                         name=new_inst_name,
                         short_name=new_inst_code,
                         code=new_inst_code,
                         country=new_inst_country,
-                        royalty_rate=Decimal("15.00"),
+                        royalty_rate=royalty_rate_value,
+                        institution_type=requested_inst_type,
                         contract_reference=f"CTR-UNIV-2026-{new_inst_code}",
                         is_active=True
                     )
@@ -257,6 +272,8 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
                     except Institution.DoesNotExist:
                         pass
 
+
+
                 # Règle SC-001 : Zéro compte orphelin pour le rôle university
                 if data['role'] == 'university' and not institution:
                     return Response({
@@ -264,6 +281,28 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
                         "data": None,
                         "error": "Un compte de rôle Université Partenaire doit obligatoirement être rattaché à une institution partenaire officielle."
                     }, status=status.HTTP_400_BAD_REQUEST)
+
+                # T017 : Unicité stricte du compte modérateur par institution
+                # Si l'institution possède déjà un modérateur actif, bloquer la création AVANT de créer l'utilisateur
+                if institution and data['role'] == 'university':
+                    existing_moderator = User.objects.filter(
+                        institution=institution,
+                        role='university',
+                        is_active=True
+                    ).first()
+                    if existing_moderator:
+                        return Response({
+                            "success": False,
+                            "data": {
+                                "existing_moderator_email": existing_moderator.email,
+                                "existing_moderator_name": f"{existing_moderator.first_name} {existing_moderator.last_name}".strip(),
+                            },
+                            "error": (
+                                f"L'institution '{institution.name}' ({institution.code}) possède déjà un compte modérateur actif "
+                                f"({existing_moderator.email}). Un seul compte officiel par institution est autorisé "
+                                "(Règle SC-002). Désactivez d'abord le compte existant si un remplacement est nécessaire."
+                            )
+                        }, status=status.HTTP_409_CONFLICT)
 
                 user = User.objects.create_user(
                     username=email,
@@ -279,7 +318,7 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
                     is_verified=True,
                 )
 
-                if institution and (not institution.user or institution.user == user):
+                if institution and (not institution.user or institution.user_id is None):
                     institution.user = user
                     institution.save(update_fields=['user'])
 

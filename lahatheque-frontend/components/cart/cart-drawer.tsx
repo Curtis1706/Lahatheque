@@ -189,10 +189,7 @@ export function CartDrawer() {
 
                         <div className="text-right">
                           <div className="font-bold text-xs font-mono text-navy">
-                            {(item.price * item.quantity).toLocaleString("fr-FR")} F CFA
-                          </div>
-                          <div className="text-[10px] text-foreground-muted font-mono">
-                            ≈ {formatEur(item.price * item.quantity)} €
+                            {(item.price * item.quantity).toLocaleString("fr-FR")} FCFA
                           </div>
                         </div>
                       </div>
@@ -211,10 +208,7 @@ export function CartDrawer() {
                   </span>
                   <div className="text-right">
                     <div className="font-mono text-base font-bold text-navy">
-                      {totalAmount.toLocaleString("fr-FR")} F CFA
-                    </div>
-                    <div className="text-xs text-foreground-muted font-mono">
-                      ≈ {formatEur(totalAmount)} €
+                      {totalAmount.toLocaleString("fr-FR")} FCFA
                     </div>
                   </div>
                 </div>

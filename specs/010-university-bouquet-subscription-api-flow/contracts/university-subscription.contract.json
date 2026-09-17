@@ -1,0 +1,71 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "UniversityBouquetSubscriptionContract",
+  "description": "Contrat d'API pour la souscription bouquet université, paiement Moneroo et délivrance de clé API",
+  "definitions": {
+    "SubscribeRequest": {
+      "type": "object",
+      "required": ["period"],
+      "properties": {
+        "period": { "type": "string", "enum": ["monthly", "annual"] },
+        "mode_paiement": { "type": "string", "default": "moneroo" },
+        "return_url": { "type": "string", "format": "uri" }
+      }
+    },
+    "SubscribeResponse": {
+      "type": "object",
+      "required": ["success", "data"],
+      "properties": {
+        "success": { "type": "boolean" },
+        "data": {
+          "type": "object",
+          "required": ["subscription_id", "status", "period", "price", "currency", "start_date", "end_date", "checkout_url"],
+          "properties": {
+            "subscription_id": { "type": "string", "format": "uuid" },
+            "status": { "type": "string", "enum": ["pending", "active"] },
+            "period": { "type": "string", "enum": ["monthly", "annual"] },
+            "price": { "type": "number" },
+            "currency": { "type": "string" },
+            "start_date": { "type": "string", "format": "date" },
+            "end_date": { "type": "string", "format": "date" },
+            "checkout_url": { "type": "string", "format": "uri" },
+            "message": { "type": "string" }
+          }
+        },
+        "error": { "type": ["string", "null"] }
+      }
+    },
+    "PostPaymentCredentialsResponse": {
+      "type": "object",
+      "required": ["success", "data"],
+      "properties": {
+        "success": { "type": "boolean" },
+        "data": {
+          "type": "object",
+          "required": ["institution_name", "subscription_title", "period", "expires_at", "credentials", "pdf_guide_url", "invoice_url"],
+          "properties": {
+            "institution_name": { "type": "string" },
+            "subscription_title": { "type": "string" },
+            "period": { "type": "string", "enum": ["monthly", "annual"] },
+            "expires_at": { "type": "string", "format": "date" },
+            "credentials": {
+              "type": "object",
+              "required": ["client_id", "client_secret", "access_mode", "tier"],
+              "properties": {
+                "client_id": { "type": "string" },
+                "client_secret": { "type": "string" },
+                "access_mode": { "type": "string", "enum": ["catalog_only"] },
+                "tier": { "type": "string", "enum": ["vip"] },
+                "is_unlimited": { "type": "boolean", "default": true }
+              }
+            },
+            "env_content": { "type": "string" },
+            "pdf_guide_url": { "type": "string", "format": "uri" },
+            "invoice_url": { "type": "string", "format": "uri" }
+          }
+        },
+        "error": { "type": ["string", "null"] }
+      }
+    }
+  }
+}

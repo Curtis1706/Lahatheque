@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { Search, ChevronDown, Check, X } from "lucide-react";
+import { Search, ChevronDown, Check, X, BookOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export interface SearchableOption {
@@ -10,6 +10,7 @@ export interface SearchableOption {
   subtitle?: string;
   badge?: string;
   icon?: React.ReactNode;
+  image?: string;
 }
 
 interface SearchableSelectProps {
@@ -108,8 +109,24 @@ export function SearchableSelect({
           !selectedOption && "text-foreground-muted"
         )}
       >
-        <div className="flex items-center gap-2 truncate flex-1 min-w-0">
-          {icon && <span className="text-gold shrink-0">{icon}</span>}
+        <div className="flex items-center gap-2.5 truncate flex-1 min-w-0">
+          {selectedOption?.image ? (
+            <div className="w-7 h-9 rounded-sm shrink-0 overflow-hidden bg-navy-dark border border-gold/30 flex items-center justify-center relative shadow-xs">
+              {selectedOption.image !== "fallback" && (
+                <img
+                  src={selectedOption.image}
+                  alt=""
+                  className="w-full h-full object-cover absolute inset-0 z-10"
+                  onError={(e) => {
+                    (e.currentTarget as HTMLElement).style.display = "none";
+                  }}
+                />
+              )}
+              <BookOpen className="w-3.5 h-3.5 text-gold/80 z-0" />
+            </div>
+          ) : icon ? (
+            <span className="text-gold shrink-0">{icon}</span>
+          ) : null}
           {selectedOption ? (
             <div className="flex flex-col truncate text-left">
               <span className="font-semibold text-navy truncate">{selectedOption.label}</span>
@@ -181,19 +198,38 @@ export function SearchableSelect({
                     type="button"
                     onClick={() => handleSelect(opt.value)}
                     className={cn(
-                      "w-full px-3 py-2 text-xs rounded-xl flex items-center justify-between gap-2 text-left transition-colors",
+                      "w-full px-3 py-2 text-xs rounded-xl flex items-center justify-between gap-2.5 text-left transition-colors",
                       isSelected
                         ? "bg-gold/15 text-navy font-bold"
                         : "hover:bg-background-secondary text-foreground hover:text-navy"
                     )}
                   >
-                    <div className="flex flex-col truncate min-w-0">
-                      <span className="truncate">{opt.label}</span>
-                      {opt.subtitle && (
-                        <span className="text-[10px] text-foreground-muted truncate font-mono">
-                          {opt.subtitle}
-                        </span>
-                      )}
+                    <div className="flex items-center gap-2.5 truncate min-w-0 flex-1">
+                      {opt.image ? (
+                        <div className="w-7 h-9 rounded-sm shrink-0 overflow-hidden bg-navy-dark border border-gold/30 flex items-center justify-center relative shadow-xs">
+                          {opt.image !== "fallback" && (
+                            <img
+                              src={opt.image}
+                              alt=""
+                              className="w-full h-full object-cover absolute inset-0 z-10"
+                              onError={(e) => {
+                                (e.currentTarget as HTMLElement).style.display = "none";
+                              }}
+                            />
+                          )}
+                          <BookOpen className="w-3.5 h-3.5 text-gold/80 z-0" />
+                        </div>
+                      ) : opt.icon ? (
+                        <span className="text-gold shrink-0">{opt.icon}</span>
+                      ) : null}
+                      <div className="flex flex-col truncate min-w-0">
+                        <span className="truncate">{opt.label}</span>
+                        {opt.subtitle && (
+                          <span className="text-[10px] text-foreground-muted truncate font-mono">
+                            {opt.subtitle}
+                          </span>
+                        )}
+                      </div>
                     </div>
 
                     <div className="flex items-center gap-1.5 shrink-0">

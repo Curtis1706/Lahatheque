@@ -163,7 +163,7 @@ function RestockModal({
           {/* Liste des ouvrages cliquables */}
           <div className="space-y-1.5">
             <label className="text-[11px] font-bold text-foreground-muted uppercase tracking-wider">
-              Ouvrage ({filteredBooks.length} disponible{filteredBooks.length > 1 ? "s" : ""})
+              Sélectionner l&apos;ouvrage
             </label>
             <div className="max-h-48 overflow-y-auto border border-border rounded-xl bg-background-secondary divide-y divide-border">
               {loadingBooks ? (

@@ -5,8 +5,6 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import { 
   ArrowLeft, 
-  ShieldCheck, 
-  Award, 
   AlertTriangle,
   Star,
   ChevronRight,
@@ -16,7 +14,6 @@ import { Book } from "@/lib/types/catalog";
 import { getBookById, searchBooks } from "@/lib/services/catalog";
 import { BookActionButtons } from "@/components/catalog/book-action-buttons";
 import { Book as Book3D } from "@/components/ui/book";
-import { formatEur } from "@/components/cart/cart-drawer";
 import { AuthorsDisplay } from "@/components/features/catalog/authors-display";
 
 export default function BookDetailPage() {
@@ -178,18 +175,6 @@ export default function BookDetailPage() {
                 width={{ sm: 180, md: 200, lg: 210, xl: 210 }}
                 textured
               />
-            </div>
-
-            {/* Badges de Confiance & Garantie */}
-            <div className="flex items-center justify-center gap-4 text-foreground-muted text-xs pt-1">
-              <span className="flex items-center gap-1.5 font-medium">
-                <ShieldCheck className="w-4 h-4 text-gold" />
-                Certifié LAHA
-              </span>
-              <span className="flex items-center gap-1.5 font-medium">
-                <Award className="w-4 h-4 text-gold" />
-                Garantie Éditeur
-              </span>
             </div>
           </div>
 
@@ -356,13 +341,7 @@ export default function BookDetailPage() {
                       {((item.price_digital !== undefined && item.price_digital !== null)
                         ? Number(item.price_digital)
                         : (item.price !== undefined && item.price !== null ? Number(item.price) : 2500)
-                      ).toLocaleString("fr-FR")} F CFA
-                    </div>
-                    <div className="text-[10px] text-foreground-muted font-mono">
-                      ≈ {formatEur((item.price_digital !== undefined && item.price_digital !== null)
-                        ? Number(item.price_digital)
-                        : (item.price !== undefined && item.price !== null ? Number(item.price) : 2500)
-                      )} €
+                      ).toLocaleString("fr-FR")} FCFA
                     </div>
                   </div>
                 </Link>

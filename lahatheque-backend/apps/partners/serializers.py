@@ -18,7 +18,7 @@ class InstitutionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Institution
-        fields = ['id', 'name', 'code', 'short_name', 'country', 'domain_name', 'royalty_rate', 'is_active', 'faculties', 'students_count']
+        fields = ['id', 'name', 'code', 'short_name', 'country', 'domain_name', 'institution_type', 'royalty_rate', 'is_active', 'faculties', 'students_count']
 
     def get_students_count(self, obj) -> int:
         if hasattr(obj, 'student_affiliations'):
@@ -70,3 +70,39 @@ class AffiliationClaimSerializer(serializers.Serializer):
 class AffiliationReviewSerializer(serializers.Serializer):
     action = serializers.ChoiceField(choices=['approve', 'reject'])
     motif_rejet = serializers.CharField(required=False, allow_blank=True, default='')
+
+
+class BouquetOfferingSerializer(serializers.ModelSerializer):
+    books_count = serializers.ReadOnlyField()
+    monthly_price = serializers.DecimalField(max_digits=12, decimal_places=2, required=False)
+    annual_price = serializers.DecimalField(max_digits=12, decimal_places=2, required=True)
+    target_institution_name = serializers.ReadOnlyField(source='target_institution.name', default=None)
+
+    class Meta:
+        from .models import BouquetOffering
+        model = BouquetOffering
+        fields = [
+            'id', 'title', 'bouquet_type', 'discipline', 'faculty_code',
+            'target_institution', 'target_institution_name', 'country',
+            'books_count', 'monthly_price', 'annual_price', 'currency',
+            'description', 'is_active', 'created_at', 'updated_at'
+        ]
+
+    def validate(self, attrs):
+        bouquet_type = attrs.get('bouquet_type', getattr(self.instance, 'bouquet_type', None))
+        target_inst = attrs.get('target_institution', getattr(self.instance, 'target_institution', None))
+        if bouquet_type == 'university' and not target_inst:
+            raise serializers.ValidationError({
+                'target_institution': "La sélection d'une université partenaire est obligatoire pour le type « Intégral Université »."
+            })
+        if bouquet_type == 'faculty':
+            raise serializers.ValidationError({
+                'bouquet_type': "Le type « Par Faculté » est obsolète et a été retiré. Veuillez utiliser « Intégral Université » ou « Par Discipline »."
+            })
+        m_price = attrs.get('monthly_price')
+        if m_price is not None and m_price < 0:
+            raise serializers.ValidationError({'monthly_price': "Le tarif mensuel ne peut pas être négatif."})
+        a_price = attrs.get('annual_price')
+        if a_price is not None and a_price < 0:
+            raise serializers.ValidationError({'annual_price': "Le tarif annuel ne peut pas être négatif."})
+        return attrs

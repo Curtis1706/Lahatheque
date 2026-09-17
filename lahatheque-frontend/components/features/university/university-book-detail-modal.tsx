@@ -24,12 +24,14 @@ interface UniversityBookDetailModalProps {
   book: UniversityBookCatalogItem | null;
   isOpen: boolean;
   onClose: () => void;
+  isPartner?: boolean;
 }
 
 export function UniversityBookDetailModal({
   book,
   isOpen,
   onClose,
+  isPartner = false,
 }: UniversityBookDetailModalProps) {
   const [detailedBook, setDetailedBook] = useState<Book | null>(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
@@ -270,15 +272,17 @@ export function UniversityBookDetailModal({
               <span>Lire l&apos;extrait gratuit</span>
             </Link>
 
-            <Link
-              href="/university/purchases/new"
-              onClick={onClose}
-              className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-navy hover:bg-navy-hover text-white text-xs font-bold transition-colors inline-flex items-center justify-center gap-2 shadow-xs min-h-[44px]"
-              title="Commander des exemplaires papier"
-            >
-              <ShoppingBag className="w-4 h-4 text-gold" />
-              <span>Commander pour le Campus</span>
-            </Link>
+            {!isPartner && (
+              <Link
+                href="/university/purchases/new"
+                onClick={onClose}
+                className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-navy hover:bg-navy-hover text-white text-xs font-bold transition-colors inline-flex items-center justify-center gap-2 shadow-xs min-h-[44px]"
+                title="Commander des exemplaires papier"
+              >
+                <ShoppingBag className="w-4 h-4 text-gold" />
+                <span>Commander pour le Campus</span>
+              </Link>
+            )}
           </div>
         </div>
       </div>

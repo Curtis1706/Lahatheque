@@ -15,7 +15,6 @@ import {
   CheckCircle2
 } from "lucide-react";
 import { useCart } from "@/context/cart-context";
-import { formatEur } from "@/components/cart/cart-drawer";
 
 export default function CartPage() {
   const { items, removeItem, updateQuantity, clearCart, totalAmount, totalCount } = useCart();
@@ -198,11 +197,8 @@ export default function CartPage() {
                   <span>Total</span>
                   <div className="text-right">
                     <span className="text-base font-bold font-mono text-navy">
-                      {totalAmount.toLocaleString("fr-FR")} F CFA
+                      {totalAmount.toLocaleString("fr-FR")} FCFA
                     </span>
-                    <div className="text-[11px] text-foreground-muted font-mono font-normal">
-                      ≈ {formatEur(totalAmount)} €
-                    </div>
                   </div>
                 </div>
 

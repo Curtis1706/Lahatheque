@@ -233,9 +233,39 @@ class StudentBooksView(APIView):
                 ).values_list('ouvrage_id', flat=True)
             )
 
+        # Récupération des bouquets documentaires actifs du client (T027)
+        from apps.commerce.models import ClientBouquetSubscription
+        from apps.partners.models import BouquetOffering
+        from django.utils import timezone as tz
+
+        today = tz.now().date()
+        active_bouquets = ClientBouquetSubscription.objects.filter(
+            user=user, status='active', start_date__lte=today, end_date__gte=today
+        )
+
+        bouquet_books_map = {}
+        for bsub in active_bouquets:
+            try:
+                offering = BouquetOffering.objects.get(id=bsub.offering_id, is_active=True)
+                for b_id in offering.get_books_queryset().values_list('id', flat=True):
+                    b_id_str = str(b_id)
+                    if b_id_str not in bouquet_books_map:
+                        bouquet_books_map[b_id_str] = {
+                            "bouquet_name": bsub.title,
+                            "bouquet_id": str(bsub.id),
+                            "bouquet_end_date": bsub.end_date.strftime("%d/%m/%Y") if bsub.end_date else None,
+                            "expires_at": bsub.end_date.isoformat() if bsub.end_date else None,
+                            "expires_in_days": max(0, (bsub.end_date - today).days) if bsub.end_date else None,
+                        }
+            except BouquetOffering.DoesNotExist:
+                continue
+
         data = []
+        processed_book_ids = set()
+
         for progress in qs:
             book_id_str = str(progress.ouvrage.id)
+            processed_book_ids.add(book_id_str)
             access_info = AccessService.check_user_book_access(user, book_id_str)
             has_digital_access = bool(access_info.get("access_granted"))
             has_audio_access = (user_audio_ids is True) or (book_id_str in user_audio_ids)
@@ -257,6 +287,9 @@ class StudentBooksView(APIView):
                 }
             ).data
 
+            is_bouquet = book_id_str in bouquet_books_map
+            b_meta = bouquet_books_map.get(book_id_str, {})
+
             data.append({
                 **ouvrage_data,
                 'is_owned': has_digital_access,
@@ -270,9 +303,61 @@ class StudentBooksView(APIView):
                 'is_completed': (progress.is_completed or progress_pct >= 100) if has_digital_access else False,
                 'is_favorite': progress.is_favorite,
                 'access_type': access_info.get("reason", "purchased") if has_digital_access else "audio_purchase",
-                'expires_at': access_info.get("expires_at"),
-                'expires_in_days': access_info.get("expires_in_days"),
+                'expires_at': access_info.get("expires_at") or b_meta.get("expires_at"),
+                'expires_in_days': access_info.get("expires_in_days") or b_meta.get("expires_in_days"),
+                'is_bouquet_book': is_bouquet,
+                'bouquet_name': b_meta.get("bouquet_name"),
+                'bouquet_id': b_meta.get("bouquet_id"),
+                'bouquet_end_date': b_meta.get("bouquet_end_date"),
             })
+
+        # Inclure les livres de bouquets non encore ouverts (sans ReadingProgress)
+        unopened_bouquet_book_ids = set(bouquet_books_map.keys()) - processed_book_ids
+        if unopened_bouquet_book_ids:
+            from apps.catalog.models import Ouvrage
+            unopened_books = Ouvrage.objects.filter(
+                id__in=unopened_bouquet_book_ids,
+                status='published'
+            ).select_related('discipline', 'publisher', 'institution').prefetch_related('authors')
+
+            for b in unopened_books:
+                b_str_id = str(b.id)
+                b_meta = bouquet_books_map.get(b_str_id, {})
+                ov_data = OuvrageBasicSerializer(
+                    b,
+                    context={
+                        'request': request,
+                        'user_audio_ids': user_audio_ids,
+                        'user_digital_ids': True,
+                    }
+                ).data
+                data.append({
+                    **ov_data,
+                    'is_owned': True,
+                    'has_digital_access': True,
+                    'is_audio_owned': False,
+                    'has_audio_access': False,
+                    'progress_percent': 0,
+                    'current_page': 0,
+                    'last_read_chapter': '',
+                    'last_read_at': None,
+                    'is_completed': False,
+                    'is_favorite': False,
+                    'access_type': 'client_bouquet_subscription',
+                    'expires_at': b_meta.get("expires_at"),
+                    'expires_in_days': b_meta.get("expires_in_days"),
+                    'is_bouquet_book': True,
+                    'bouquet_name': b_meta.get("bouquet_name"),
+                    'bouquet_id': b_meta.get("bouquet_id"),
+                    'bouquet_end_date': b_meta.get("bouquet_end_date"),
+                })
+
+        # Filtrage par onglet (format_filter ou tab)
+        tab_param = request.query_params.get('tab')
+        if tab_param == 'bouquets' or format_filter == 'bouquets':
+            data = [d for d in data if d.get('is_bouquet_book')]
+        elif tab_param == 'purchased':
+            data = [d for d in data if not d.get('is_bouquet_book')]
 
         return Response({'success': True, 'data': data, 'error': None})
 

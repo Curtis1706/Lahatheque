@@ -31,12 +31,22 @@ class RoyaltiesViewSetTestCase(TestCase):
             code="UNIV-CTN-TEST",
             contract_reference="CONV-INST-2026-TEST",
             royalty_rate=15.00,
+            institution_type="partner",
+            is_active=True
+        )
+        self.client_institution = Institution.objects.create(
+            name="Université Cliente Privée",
+            code="UNIV-CLI-TEST",
+            contract_reference="CONV-CLI-2026-TEST",
+            royalty_rate=0.00,
+            institution_type="client",
             is_active=True
         )
 
-    def test_partner_configs_returns_real_partners(self):
+    def test_partner_configs_returns_real_partners_and_excludes_clients(self):
         """
-        Vérifie que GET /api/v1/admin/royalties/payouts/partners/ retourne les vrais contrats et universités.
+        Vérifie que GET /api/v1/admin/royalties/payouts/partners/ retourne les vrais contrats et universités partenaires,
+        et exclut rigoureusement les universités clientes (T022).
         """
         response = self.client.get('/api/v1/admin/royalties/payouts/partners/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -54,9 +64,13 @@ class RoyaltiesViewSetTestCase(TestCase):
         self.assertEqual(inst["partner_name"], "Université Test Cotonou")
         self.assertEqual(inst["custom_royalty_rate"], 15.0)
 
+        # Vérifie qu'aucun établissement client n'est présent dans la liste des reversements
+        client_matches = [p for p in partners if p["partner_id"] == str(self.client_institution.id)]
+        self.assertEqual(len(client_matches), 0, "Une université cliente ne doit pas figurer dans les reversements partenaires (T022)")
+
     def test_update_partner_rate_updates_institution_rate(self):
         """
-        Vérifie que POST /api/v1/admin/royalties/payouts/partners/rate/ met à jour le taux d'une université.
+        Vérifie que POST /api/v1/admin/royalties/payouts/partners/rate/ met à jour le taux d'une université partenaire.
         """
         payload = {
             "partner_id": str(self.institution.id),
@@ -67,3 +81,16 @@ class RoyaltiesViewSetTestCase(TestCase):
 
         self.institution.refresh_from_db()
         self.assertEqual(float(self.institution.royalty_rate), 18.5)
+
+    def test_update_partner_rate_blocks_client_institution(self):
+        """
+        Vérifie que POST /api/v1/admin/royalties/payouts/partners/rate/ rejette la modification de taux pour une université cliente.
+        """
+        payload = {
+            "partner_id": str(self.client_institution.id),
+            "new_rate": 10.0
+        }
+        response = self.client.post('/api/v1/admin/royalties/payouts/partners/rate/', payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.client_institution.refresh_from_db()
+        self.assertEqual(float(self.client_institution.royalty_rate), 0.0)

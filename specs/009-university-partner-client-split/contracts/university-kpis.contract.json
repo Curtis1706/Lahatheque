@@ -1,0 +1,61 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "UniversityKpisResponse",
+  "description": "Contrat d'échange pour l'endpoint GET /api/v1/partners/university/kpis/",
+  "type": "object",
+  "required": ["success", "data", "error"],
+  "properties": {
+    "success": { "type": "boolean" },
+    "error": { "type": ["string", "null"] },
+    "data": {
+      "type": "object",
+      "required": [
+        "institution_name",
+        "institution_code",
+        "institution_type",
+        "active_bouquets_count",
+        "monthly_consultations_count",
+        "total_royalties_available",
+        "total_royalties_paid",
+        "currency",
+        "revenue_split"
+      ],
+      "properties": {
+        "institution_name": { "type": "string" },
+        "institution_code": { "type": "string" },
+        "institution_type": {
+          "type": "string",
+          "enum": ["partner", "client"]
+        },
+        "catalog_books_count": { "type": "integer", "minimum": 0 },
+        "accessible_books_count": { "type": "integer", "minimum": 0 },
+        "active_bouquets_count": { "type": "integer", "minimum": 0 },
+        "monthly_consultations_count": { "type": "integer", "minimum": 0 },
+        "total_royalties_available": { "type": "number", "minimum": 0 },
+        "total_royalties_paid": { "type": "number", "minimum": 0 },
+        "audience_share_percent": { "type": "number", "minimum": 0, "maximum": 100 },
+        "currency": { "type": "string", "default": "XOF" },
+        "consultations_trend_percent": { "type": "number" },
+        "revenue_split": {
+          "type": ["object", "null"],
+          "properties": {
+            "total_ca": { "type": "number" },
+            "university_amount": { "type": "number" },
+            "university_percent": { "type": "number" },
+            "laha_amount": { "type": "number" },
+            "laha_percent": { "type": "number" },
+            "currency": { "type": "string" }
+          },
+          "required": [
+            "total_ca",
+            "university_amount",
+            "university_percent",
+            "laha_amount",
+            "laha_percent",
+            "currency"
+          ]
+        }
+      }
+    }
+  }
+}

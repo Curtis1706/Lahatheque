@@ -9,6 +9,7 @@ import {
   LogOut,
   Sparkles,
   ShieldCheck,
+  ShieldAlert,
   Play,
   Pause,
   Sun,
@@ -137,11 +138,16 @@ export default function HostedReaderPage() {
 
     try {
       const targetUrl = `/api/bff/reader/sessions/stream/?lang=${newLang}`;
+      const deviceToken = hostedReaderApi.getDeviceBindingToken(token);
+      const streamHeaders: Record<string, string> = {
+        Accept: "application/pdf",
+        "X-Reader-Token": token,
+      };
+      if (deviceToken) {
+        streamHeaders["X-Reader-Device-Token"] = deviceToken;
+      }
       const streamRes = await fetch(targetUrl, {
-        headers: {
-          Accept: "application/pdf",
-          "X-Reader-Token": token,
-        },
+        headers: streamHeaders,
         credentials: "include",
       });
       if (streamRes.ok) {
@@ -227,11 +233,17 @@ export default function HostedReaderPage() {
 
     const loadBlob = async () => {
       try {
+        const deviceToken = hostedReaderApi.getDeviceBindingToken(token);
+        const streamHeaders: Record<string, string> = {
+          Accept: "application/pdf",
+          "X-Reader-Token": token,
+        };
+        if (deviceToken) {
+          streamHeaders["X-Reader-Device-Token"] = deviceToken;
+        }
+
         const streamRes = await fetch(targetUrl, {
-          headers: {
-            Accept: "application/pdf",
-            "X-Reader-Token": token,
-          },
+          headers: streamHeaders,
           credentials: "include",
         });
         if (streamRes.ok) {
@@ -623,18 +635,36 @@ export default function HostedReaderPage() {
 
   // Rendu de l'écran d'erreur
   if (error || !session) {
+    const isLockedError =
+      error?.toLowerCase().includes("verrouillée") ||
+      error?.toLowerCase().includes("partage") ||
+      error?.toLowerCase().includes("verrouillee");
+
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-[#0F1A33] text-white p-6 text-center">
-        <div className="w-14 h-14 rounded-full bg-red-500/15 border border-red-500/30 flex items-center justify-center text-red-400 mb-4">
-          <ShieldCheck className="w-7 h-7" />
+      <div className="flex flex-col items-center justify-center min-h-screen bg-navy-dark text-white p-6 text-center">
+        <div className="w-16 h-16 rounded-full bg-red-500/15 border border-red-500/30 flex items-center justify-center text-red-400 mb-5 shadow-inner">
+          {isLockedError ? <ShieldAlert className="w-8 h-8" /> : <ShieldCheck className="w-8 h-8" />}
         </div>
-        <h2 className="text-xl font-bold font-serif mb-2">Session de Lecture Expirée ou Invalide</h2>
-        <p className="text-xs text-white/70 max-w-md mb-6">
-          {error || "Ce lien de lecture a expiré. Veuillez relancer la consultation depuis votre plateforme."}
+        <h2 className="text-xl sm:text-2xl font-bold font-serif mb-2 text-white">
+          {isLockedError ? "Session de Lecture Verrouillée" : "Session de Lecture Inaccessible"}
+        </h2>
+        <p className="text-xs sm:text-sm text-white/80 max-w-lg mb-6 leading-relaxed">
+          {error || "Ce lien de lecture a expiré ou n'est plus valide. Veuillez relancer la consultation depuis votre plateforme."}
         </p>
+        {isLockedError && (
+          <div className="mb-6 p-4 rounded-2xl bg-white/5 border border-white/10 max-w-md text-[11px] text-white/70 space-y-1.5 text-left font-sans">
+            <p className="font-semibold text-gold">Consigne de sécurité et droits d'auteur :</p>
+            <p>
+              Pour empêcher le partage illicite, ce lien est exclusivement rattaché au premier navigateur sur lequel il a été ouvert.
+            </p>
+            <p>
+              Si vous êtes l'apprenant autorisé, continuez votre lecture sur l'onglet initial ou connectez-vous à nouveau sur votre plateforme partenaire.
+            </p>
+          </div>
+        )}
         <button
           onClick={() => window.history.back()}
-          className="px-5 py-2 rounded-xl bg-gold text-navy font-bold text-xs hover:brightness-110 transition-all cursor-pointer shadow-sm"
+          className="px-6 py-2.5 rounded-xl bg-gold text-navy font-bold text-xs hover:brightness-110 transition-all cursor-pointer shadow-sm"
         >
           Retourner à l'application
         </button>

@@ -103,18 +103,13 @@ class BouquetRevenueDistributionTestCase(TestCase):
         self.assertEqual(result["shared_bouquets_processed"], 0)
         self.assertEqual(result["statements_created"], 0)
 
-    def test_no_usage_falls_back_to_equal_split(self):
+    def test_no_usage_creates_no_statements(self):
+        """ZÉRO MOCK, ZÉRO SIMULATION : si aucune consultation qualifiée, aucune redevance n'est générée."""
         result = task_distribute_bouquet_revenue()
 
         self.assertEqual(result["shared_bouquets_processed"], 1)
-        self.assertEqual(result["statements_created"], 3)
-
-        pool_mensuel = float(Decimal("120000.00")) / 12
-        part_egale_attendue = pool_mensuel / 3
-
-        for inst in (self.uac, self.una, self.parakou):
-            stmt = UniversityRoyaltyStatement.objects.filter(institution=inst).latest("created_at")
-            self.assertAlmostEqual(float(stmt.total_sales_catalog), part_egale_attendue, places=1)
+        self.assertEqual(result["statements_created"], 0)
+        self.assertEqual(UniversityRoyaltyStatement.objects.count(), 0)
 
     def test_idempotent_on_rerun(self):
         self._create_traces(self.sub_uac, 10)

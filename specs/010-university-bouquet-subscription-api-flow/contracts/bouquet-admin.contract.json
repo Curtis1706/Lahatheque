@@ -1,0 +1,61 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "BouquetAdminContract",
+  "description": "Contrat d'API pour l'administration des bouquets documentaires avec tarification bipériodique et aperçu des livres par université",
+  "definitions": {
+    "BouquetOfferingPayload": {
+      "type": "object",
+      "required": ["title", "bouquet_type", "monthly_price", "annual_price"],
+      "properties": {
+        "title": { "type": "string", "minLength": 3 },
+        "bouquet_type": {
+          "type": "string",
+          "enum": ["general", "discipline", "university", "country", "custom"]
+        },
+        "discipline": { "type": "string" },
+        "target_institution": { "type": ["string", "null"], "format": "uuid" },
+        "country": { "type": "string", "maxLength": 2 },
+        "monthly_price": { "type": "number", "minimum": 1 },
+        "annual_price": { "type": "number", "minimum": 1 },
+        "currency": { "type": "string", "default": "XOF" },
+        "description": { "type": "string" },
+        "is_active": { "type": "boolean", "default": true },
+        "custom_book_ids": {
+          "type": "array",
+          "items": { "type": "string", "format": "uuid" }
+        }
+      }
+    },
+    "InstitutionBooksPreviewResponse": {
+      "type": "object",
+      "required": ["success", "data"],
+      "properties": {
+        "success": { "type": "boolean" },
+        "data": {
+          "type": "object",
+          "required": ["institution_id", "institution_name", "total_books", "books"],
+          "properties": {
+            "institution_id": { "type": "string", "format": "uuid" },
+            "institution_name": { "type": "string" },
+            "total_books": { "type": "integer", "minimum": 0 },
+            "books": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["id", "title", "cover_url", "discipline_name"],
+                "properties": {
+                  "id": { "type": "string", "format": "uuid" },
+                  "title": { "type": "string" },
+                  "author_name": { "type": "string" },
+                  "discipline_name": { "type": "string" },
+                  "cover_url": { "type": "string", "format": "uri" }
+                }
+              }
+            }
+          }
+        },
+        "error": { "type": ["string", "null"] }
+      }
+    }
+  }
+}

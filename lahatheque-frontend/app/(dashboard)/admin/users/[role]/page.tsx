@@ -12,7 +12,7 @@ import { AuthorDiscountsModal } from "@/components/features/admin/author-discoun
 import { getAdminUsers, toggleAdminUserStatus, deleteAdminUser, updatePartnerRoyaltyRate } from "@/lib/services/admin";
 import { AdminUser, AdminRole, formatRoleLabel, formatCountryName } from "@/lib/types/admin";
 import { EditUniversityUserModal } from "@/components/features/admin/edit-university-user-modal";
-import { Users, UserPlus, Eye, XCircle, CheckCircle, ArrowLeft, Mail, FileText, CheckCheck, Clock, Trash2, Sliders, Sparkles, Building2, Pencil, Percent, Save } from "lucide-react";
+import { Users, UserPlus, Eye, XCircle, CheckCircle, ArrowLeft, Mail, FileText, CheckCheck, Clock, Trash2, Sliders, Sparkles, Building2, Pencil, Percent, Save, RefreshCw } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 
@@ -419,6 +419,8 @@ export default function AdminRoleUsersPage() {
               const inst = (row as any).institution_detail || (row as any).institution;
               const instName = inst?.name || (row as any).institution_name || row.extra_info?.institution_name;
               const instCode = inst?.code || "";
+              const instType: "partner" | "client" = inst?.institution_type || "partner";
+              const isClient = instType === "client";
               const hasInstitution = Boolean(instName);
               return (
                 <div className="flex items-center gap-2.5">
@@ -430,13 +432,22 @@ export default function AdminRoleUsersPage() {
                   <div>
                     {hasInstitution ? (
                       <>
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-1.5 flex-wrap">
                           <p className="font-bold text-xs text-navy">{instName}</p>
                           {instCode && (
                             <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-gold/10 border border-gold/20 text-gold">
                               {instCode}
                             </span>
                           )}
+                          <span
+                            className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${
+                              isClient
+                                ? "bg-navy/5 border-navy/20 text-navy"
+                                : "bg-gold/10 border-gold/20 text-gold"
+                            }`}
+                          >
+                            {isClient ? "Cliente" : "Partenaire"}
+                          </span>
                         </div>
                         <p className="text-[11px] text-foreground-muted">{row.first_name} {row.last_name} · {row.email}</p>
                       </>
@@ -461,6 +472,14 @@ export default function AdminRoleUsersPage() {
             header: "Taux Conventionné",
             cell: (row) => {
               const inst = (row as any).institution_detail || (row as any).institution;
+              const isClient = inst?.institution_type === "client";
+              if (isClient) {
+                return (
+                  <span className="text-xs text-foreground-muted italic px-2 py-0.5 rounded bg-background-secondary border border-border">
+                    Non applicable
+                  </span>
+                );
+              }
               const rate = inst?.royalty_rate ?? 15.0;
               return (
                 <span className="text-xs font-bold font-mono px-2 py-0.5 rounded-full bg-gold/10 border border-gold/20 text-gold">
@@ -705,13 +724,24 @@ export default function AdminRoleUsersPage() {
             </p>
           </div>
 
-          <button
-            onClick={() => setIsCreateModalOpen(true)}
-            className="px-4 py-2.5 rounded-xl bg-navy text-white text-xs font-semibold hover:bg-navy-hover transition-colors flex items-center gap-2 shadow-sm shrink-0"
-          >
-            <UserPlus className="w-4 h-4" />
-            Ajouter un compte
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => loadRoleUsers()}
+              disabled={loading}
+              title="Actualiser les données"
+              className="p-2.5 rounded-xl border border-border bg-background text-foreground hover:bg-background-secondary transition-colors flex items-center justify-center shrink-0 disabled:opacity-50 cursor-pointer"
+            >
+              <RefreshCw className={`w-4 h-4 text-navy ${loading ? "animate-spin" : ""}`} />
+            </button>
+
+            <button
+              onClick={() => setIsCreateModalOpen(true)}
+              className="px-4 py-2.5 rounded-xl bg-navy text-white text-xs font-semibold hover:bg-navy-hover transition-colors flex items-center gap-2 shadow-sm shrink-0 cursor-pointer"
+            >
+              <UserPlus className="w-4 h-4" />
+              Ajouter un compte
+            </button>
+          </div>
         </div>
       </div>
 
