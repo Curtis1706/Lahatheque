@@ -529,8 +529,22 @@ class PublisherDepositsView(APIView):
             except Exception:
                 protection_config = {}
 
-        cover_uploaded_url = self._save_uploaded_cover(request)
-        final_cover_url = cover_uploaded_url or data.get("cover_url", "/placeholder-cover.jpg")
+        cover_key = data.get("cover_key")
+        if cover_key:
+            from django.core.files.storage import default_storage
+            final_cover_url = default_storage.url(cover_key) if hasattr(default_storage, "url") else cover_key
+        else:
+            cover_uploaded_url = self._save_uploaded_cover(request)
+            final_cover_url = cover_uploaded_url or data.get("cover_url", "/placeholder-cover.jpg")
+
+        file_key = data.get("file_key")
+        if file_key:
+            from django.core.files.storage import default_storage
+            final_file_url = default_storage.url(file_key) if hasattr(default_storage, "url") else file_key
+        elif request.FILES.get("file"):
+            final_file_url = self._save_uploaded_file(request)
+        else:
+            final_file_url = data.get("file_url", "")
 
         deposit = PublisherBookDeposit.objects.create(
             publisher=prof,
@@ -552,7 +566,7 @@ class PublisherDepositsView(APIView):
             summary=data.get("summary", "Ouvrage déposé pour examen par le comité éditorial."),
             authors_bio=data.get("authors_bio", ""),
             cover_url=final_cover_url,
-            file_url=self._save_uploaded_file(request) if request.FILES.get("file") else data.get("file_url", ""),
+            file_url=final_file_url,
             file_format=data.get("file_format", "pdf"),
             licence_type=data.get("licence_type", "tous_droits_reserves"),
             status=PublisherDepositStatus.PENDING,
