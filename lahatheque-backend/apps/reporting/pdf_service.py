@@ -69,7 +69,7 @@ class PartnerIntegrationGuidePdfService:
         cls._draw_header_footer(p1, 1, total_pages)
 
         # Grand Encart Titre
-        p1.draw_rect(fitz.Rect(40, 85, 555, 210), color=cls.BORDER_LIGHT, fill=cls.BG_LIGHT, radius=4)
+        p1.draw_rect(fitz.Rect(40, 85, 555, 210), color=cls.BORDER_LIGHT, fill=cls.BG_LIGHT)
         p1.draw_rect(fitz.Rect(40, 85, 46, 210), color=cls.GOLD, fill=cls.GOLD)
 
         p1.insert_text(fitz.Point(60, 115), "SPÉCIFICATION D'INTÉGRATION TECHNIQUE", fontsize=9, fontname="helv", color=cls.GOLD)
@@ -113,7 +113,7 @@ class PartnerIntegrationGuidePdfService:
         ]
         box_y = 465
         for st_num, st_title, st_desc in steps:
-            p1.draw_rect(fitz.Rect(40, box_y, 555, box_y + 44), color=cls.BORDER_LIGHT, fill=cls.BG_LIGHT, radius=3)
+            p1.draw_rect(fitz.Rect(40, box_y, 555, box_y + 44), color=cls.BORDER_LIGHT, fill=cls.BG_LIGHT)
             p1.draw_rect(fitz.Rect(40, box_y, 95, box_y + 44), color=cls.NAVY, fill=cls.NAVY)
             p1.insert_text(fitz.Point(46, box_y + 26), st_num, fontsize=9, fontname="helv", color=cls.WHITE)
             p1.insert_text(fitz.Point(105, box_y + 17), st_title, fontsize=9.5, fontname="helv", color=cls.NAVY)
@@ -121,7 +121,7 @@ class PartnerIntegrationGuidePdfService:
             box_y += 50
 
         # Encart Note
-        p1.draw_rect(fitz.Rect(40, 680, 555, 760), color=cls.BORDER_LIGHT, fill=cls.WHITE, radius=4)
+        p1.draw_rect(fitz.Rect(40, 680, 555, 760), color=cls.BORDER_LIGHT, fill=cls.WHITE)
         p1.draw_rect(fitz.Rect(40, 680, 44, 760), color=cls.NAVY, fill=cls.NAVY)
         p1.insert_text(fitz.Point(54, 700), "REMARQUE IMPORTANTE SUR LA SOUVERAINETÉ DE LA LISEUSE", fontsize=8.5, fontname="helv", color=cls.GOLD)
         note_txt = (
@@ -148,7 +148,7 @@ class PartnerIntegrationGuidePdfService:
         )
 
         # Bloc .env
-        p2.draw_rect(fitz.Rect(40, 150, 555, 235), color=cls.NAVY_HOVER, fill=cls.NAVY_DARK, radius=4)
+        p2.draw_rect(fitz.Rect(40, 150, 555, 235), color=cls.NAVY_HOVER, fill=cls.NAVY_DARK)
         p2.insert_text(fitz.Point(55, 175), "# Configuration LAHAThèque API — Fichier .env", fontsize=8.5, fontname="helv", color=cls.TEXT_MUTED)
         p2.insert_text(fitz.Point(55, 195), "LAHATHEQUE_CLIENT_ID=laha_client_votre_identifiant_unique", fontsize=9, fontname="helv", color=cls.WHITE)
         p2.insert_text(fitz.Point(55, 212), "LAHATHEQUE_CLIENT_SECRET=sec_live_votre_secret_prive_chiffre", fontsize=9, fontname="helv", color=cls.GOLD)
@@ -190,7 +190,7 @@ class PartnerIntegrationGuidePdfService:
 
         # Exemple JSON Theme
         p2.insert_text(fitz.Point(40, 500), "Exemple d'objet JSON de personnalisation :", fontsize=10, fontname="helv", color=cls.NAVY)
-        p2.draw_rect(fitz.Rect(40, 510, 555, 620), color=cls.NAVY_HOVER, fill=cls.NAVY_DARK, radius=4)
+        p2.draw_rect(fitz.Rect(40, 510, 555, 620), color=cls.NAVY_HOVER, fill=cls.NAVY_DARK)
         json_sample = [
             '{\n',
             '  "theme": {\n',
@@ -216,7 +216,7 @@ class PartnerIntegrationGuidePdfService:
 
         # 5.1 OAuth2 Token
         p3.insert_text(fitz.Point(40, 125), "5.1 Obtention du jeton Bearer (OAuth 2.0)", fontsize=11, fontname="helv", color=cls.NAVY)
-        p3.draw_rect(fitz.Rect(40, 135, 555, 235), color=cls.BORDER_LIGHT, fill=cls.BG_LIGHT, radius=3)
+        p3.draw_rect(fitz.Rect(40, 135, 555, 235), color=cls.BORDER_LIGHT, fill=cls.BG_LIGHT)
         p3.insert_text(fitz.Point(50, 153), "POST /api/v1/oauth2/token/", fontsize=9.5, fontname="helv", color=cls.NAVY)
         p3.insert_text(fitz.Point(50, 168), "Content-Type: application/x-www-form-urlencoded", fontsize=8.5, fontname="helv", color=cls.TEXT_MUTED)
         
@@ -228,7 +228,7 @@ class PartnerIntegrationGuidePdfService:
 
         # 5.2 Catalogue
         p3.insert_text(fitz.Point(40, 260), "5.2 Consultation du Catalogue Partenaire", fontsize=11, fontname="helv", color=cls.NAVY)
-        p3.draw_rect(fitz.Rect(40, 270, 555, 410), color=cls.BORDER_LIGHT, fill=cls.BG_LIGHT, radius=3)
+        p3.draw_rect(fitz.Rect(40, 270, 555, 410), color=cls.BORDER_LIGHT, fill=cls.BG_LIGHT)
         p3.insert_text(fitz.Point(50, 288), "GET /api/v1/partner/catalog/", fontsize=9.5, fontname="helv", color=cls.NAVY)
         p3.insert_text(fitz.Point(50, 303), "Authorization: Bearer <access_token>", fontsize=8.5, fontname="helv", color=cls.TEXT_MUTED)
 
@@ -243,7 +243,7 @@ class PartnerIntegrationGuidePdfService:
 
         # 5.3 Reader Session
         p3.insert_text(fitz.Point(40, 435), "5.3 Création d'une Session de Lecture Sécurisée", fontsize=11, fontname="helv", color=cls.NAVY)
-        p3.draw_rect(fitz.Rect(40, 445, 555, 680), color=cls.NAVY_HOVER, fill=cls.NAVY_DARK, radius=4)
+        p3.draw_rect(fitz.Rect(40, 445, 555, 680), color=cls.NAVY_HOVER, fill=cls.NAVY_DARK)
         p3.insert_text(fitz.Point(55, 465), "POST /api/v1/reader/sessions/", fontsize=9.5, fontname="helv", color=cls.GOLD)
         p3.insert_text(fitz.Point(55, 480), "Headers : Authorization: Bearer <access_token> | Content-Type: application/json", fontsize=8, fontname="helv", color=cls.TEXT_MUTED)
 
@@ -283,7 +283,7 @@ class PartnerIntegrationGuidePdfService:
         ]
         s_y = 120
         for title, desc in sec_points:
-            p4.draw_rect(fitz.Rect(40, s_y, 555, s_y + 55), color=cls.BORDER_LIGHT, fill=cls.BG_LIGHT, radius=3)
+            p4.draw_rect(fitz.Rect(40, s_y, 555, s_y + 55), color=cls.BORDER_LIGHT, fill=cls.BG_LIGHT)
             p4.draw_rect(fitz.Rect(40, s_y, 44, s_y + 55), color=cls.GOLD, fill=cls.GOLD)
             p4.insert_text(fitz.Point(55, s_y + 18), title, fontsize=9.5, fontname="helv", color=cls.NAVY)
             p4.insert_textbox(fitz.Rect(55, s_y + 22, 545, s_y + 52), desc, fontsize=8.5, fontname="helv", color=cls.TEXT_MUTED)
@@ -293,7 +293,7 @@ class PartnerIntegrationGuidePdfService:
         p4.insert_text(fitz.Point(40, 400), "7. Support Technique Partenaires & Assistance", fontsize=13, fontname="helv", color=cls.NAVY)
         p4.draw_line(fitz.Point(40, 406), fitz.Point(555, 406), color=cls.BORDER_LIGHT, width=1)
 
-        p4.draw_rect(fitz.Rect(40, 420, 555, 550), color=cls.NAVY, fill=cls.NAVY_DARK, radius=4)
+        p4.draw_rect(fitz.Rect(40, 420, 555, 550), color=cls.NAVY, fill=cls.NAVY_DARK)
         p4.insert_text(fitz.Point(60, 445), "ÉQUIPE TECHNIQUE & CELLULE INTÉGRATION ACADÉMIQUE", fontsize=10, fontname="helv", color=cls.GOLD)
         p4.insert_text(fitz.Point(60, 470), "Éditions LAHA • Département Systèmes d'Information & Bibliothèque Numérique", fontsize=9, fontname="helv", color=cls.WHITE)
         p4.insert_text(fitz.Point(60, 492), "Email officiel du Support Partenaires : api-support@lahatheque.com", fontsize=9, fontname="helv", color=cls.WHITE)
@@ -301,7 +301,7 @@ class PartnerIntegrationGuidePdfService:
         p4.insert_text(fitz.Point(60, 532), "Portail Documentation Développeur : https://docs.lahatheque.com", fontsize=9, fontname="helv", color=cls.GOLD)
 
         # Certification
-        p4.draw_rect(fitz.Rect(40, 580, 555, 680), color=cls.BORDER_LIGHT, fill=cls.BG_LIGHT, radius=4)
+        p4.draw_rect(fitz.Rect(40, 580, 555, 680), color=cls.BORDER_LIGHT, fill=cls.BG_LIGHT)
         p4.insert_text(fitz.Point(60, 605), "CERTIFICAT DE CONFORMITÉ TECHNIQUE", fontsize=10, fontname="helv", color=cls.NAVY)
         cert_text = (
             "Ce guide technique fait autorité pour toutes les intégrations en mode Catalogue Seul "
@@ -364,7 +364,7 @@ class BouquetInvoicePdfService:
         p.insert_text(fitz.Point(410, 52), f"Émise le {date_str}", fontsize=8.5, fontname="helv", color=cls.WHITE)
 
         # 2. Tampon Acquitté Vert
-        p.draw_rect(fitz.Rect(410, 95, 555, 122), color=cls.EMERALD, fill=cls.WHITE, width=1.5, radius=3)
+        p.draw_rect(fitz.Rect(410, 95, 555, 122), color=cls.EMERALD, fill=cls.WHITE, width=1.5)
         p.insert_text(fitz.Point(422, 112), "ACQUITTÉE • PAIEMENT VALIDÉ", fontsize=8, fontname="helv", color=cls.EMERALD)
 
         # 3. Émetteur & Souscripteur
@@ -381,7 +381,7 @@ class BouquetInvoicePdfService:
             p.insert_text(fitz.Point(260, 158), f"Contact : {customer_email}", fontsize=8.5, fontname="helv", color=cls.TEXT_DARK)
 
         # 4. Détails de règlement
-        p.draw_rect(fitz.Rect(40, 185, 555, 225), color=cls.BORDER_LIGHT, fill=cls.BG_LIGHT, radius=3)
+        p.draw_rect(fitz.Rect(40, 185, 555, 225), color=cls.BORDER_LIGHT, fill=cls.BG_LIGHT)
         p.insert_text(fitz.Point(55, 202), f"Mode d'encaissement : {pay_method}", fontsize=8.5, fontname="helv", color=cls.TEXT_DARK)
         p.insert_text(fitz.Point(55, 216), f"Réf. transaction : {tx_ref}", fontsize=8.5, fontname="helv", color=cls.TEXT_MUTED)
         p.insert_text(fitz.Point(340, 202), f"Devise de facturation : {currency}", fontsize=8.5, fontname="helv", color=cls.TEXT_DARK)
@@ -405,7 +405,7 @@ class BouquetInvoicePdfService:
 
         # 6. Totaux
         tot_y = t_y + 20
-        p.draw_rect(fitz.Rect(320, tot_y, 555, tot_y + 75), color=cls.BORDER_LIGHT, fill=cls.BG_LIGHT, radius=3)
+        p.draw_rect(fitz.Rect(320, tot_y, 555, tot_y + 75), color=cls.BORDER_LIGHT, fill=cls.BG_LIGHT)
         p.insert_text(fitz.Point(335, tot_y + 22), "Total Brut HT :", fontsize=9, fontname="helv", color=cls.TEXT_DARK)
         p.insert_text(fitz.Point(460, tot_y + 22), amt_str, fontsize=9, fontname="helv", color=cls.TEXT_DARK)
         p.insert_text(fitz.Point(335, tot_y + 40), "TVA (0% Régime Éducation) :", fontsize=8.5, fontname="helv", color=cls.TEXT_MUTED)
@@ -417,7 +417,7 @@ class BouquetInvoicePdfService:
 
         # 7. Bloc de Validité
         val_y = tot_y + 105
-        p.draw_rect(fitz.Rect(40, val_y, 555, val_y + 65), color=cls.BORDER_LIGHT, fill=cls.BG_LIGHT, radius=4)
+        p.draw_rect(fitz.Rect(40, val_y, 555, val_y + 65), color=cls.BORDER_LIGHT, fill=cls.BG_LIGHT)
         p.draw_rect(fitz.Rect(40, val_y, 45, val_y + 65), color=cls.GOLD, fill=cls.GOLD)
         p.insert_text(fitz.Point(55, val_y + 20), "PÉRIODE DE VALIDITÉ DE LA LICENCE ACADÉMIQUE :", fontsize=9, fontname="helv", color=cls.GOLD)
         val_msg = f"Droits d'accès certifiés valables du {start_date} au {end_date} inclus."

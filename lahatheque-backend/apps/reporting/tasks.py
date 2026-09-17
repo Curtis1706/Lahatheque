@@ -151,7 +151,7 @@ def task_scan_and_send_unpaid_reminders():
     Scan des commandes et factures impayées depuis plus de N jours.
     """
     config = _get_platform_config()
-    cutoff_date = timezone.now() - timedelta(days=int(config.delai_relance_impayes_jours or 7))
+    cutoff_date = timezone.now() - timedelta(days=int(config.delai_relance_impayes_jours or 7) if config.delai_relance_impayes_jours is not None else 7)
     results = {"processed": 0, "sent": 0, "errors": 0}
 
     try:
@@ -238,7 +238,7 @@ def task_scan_and_send_subscription_expiry_reminders():
     Scan des abonnements et bouquets arrivant à expiration sous N jours.
     """
     config = _get_platform_config()
-    target_date_max = timezone.now() + timedelta(days=int(config.delai_relance_abonnements_jours or 15))
+    target_date_max = timezone.now() + timedelta(days=int(config.delai_relance_abonnements_jours or 15) if config.delai_relance_abonnements_jours is not None else 15)
     results = {"processed": 0, "sent": 0, "errors": 0}
 
     try:
@@ -978,9 +978,7 @@ def send_bouquet_subscription_emails(subscription_id: str):
     """
     from apps.partners.models import UniversityBouquetSubscription
     from apps.commerce.models import ClientBouquetSubscription
-    from apps.reporting.pdf_service import BouquetInvoicePdfService
     from apps.communications.services.email_service import send_transactional_email
-    from apps.communications.services.email_provider_base import EmailAttachment
     from apps.accounts.models import User
     from django.conf import settings
     from django.utils import timezone
@@ -1021,38 +1019,29 @@ def send_bouquet_subscription_emails(subscription_id: str):
     if sub.payment_transaction:
         tx_ref = sub.payment_transaction.moneroo_id or str(sub.payment_transaction.id)[:8]
 
-    # Génération de la facture PDF acquittée
-    invoice_data = {
-        "invoice_number": invoice_number,
+    # Génération de la facture PDF acquittée (aligné sur le flux officiel des achats d'ouvrages)
+    customer_addr = getattr(institution, 'address', None) or "Cotonou, Bénin"
+    pdf_invoice_data = {
+        "order_number": invoice_number,
         "customer_name": recipient_name,
         "customer_email": recipient_email or "",
-        "institution_code": institution.code if institution else "",
+        "customer_address": customer_addr,
         "date": date_str,
-        "bouquet_title": sub.title,
-        "period_label": period_label,
-        "amount": amount,
+        "items": [
+            {
+                "title": f"Abonnement Bouquet Documentaire « {sub.title} » ({period_label})",
+                "quantity": 1,
+                "unit_price": amount,
+                "total": amount,
+            }
+        ],
+        "total_amount": amount,
         "currency": currency,
         "payment_method": "Moneroo Mobile Money",
-        "transaction_ref": tx_ref or "PAIEMENT_VALIDE",
-        "start_date": sub.start_date.strftime("%d/%m/%Y") if sub.start_date else date_str,
-        "end_date": end_date_str,
-        "is_university": is_univ,
+        "is_paid": True,
     }
 
-    attachments = []
-    try:
-        pdf_bytes = BouquetInvoicePdfService.generate_invoice_pdf(invoice_data)
-        attachments.append(
-            EmailAttachment(
-                filename=f"Facture_{invoice_number}.pdf",
-                content=pdf_bytes,
-                content_type="application/pdf"
-            )
-        )
-    except Exception as pdf_err:
-        logger.error(f"[EMAIL BOUQUET] Erreur génération PDF facture: {pdf_err}")
-
-    # 1. Envoi au client ou à l'université
+    # 1. Envoi au client ou à l'université avec facture PDF jointe
     if recipient_email:
         context_client = {
             "recipient_name": recipient_name,
@@ -1071,14 +1060,14 @@ def send_bouquet_subscription_emails(subscription_id: str):
                 template_name="emails/orders/bouquet_confirmation.html",
                 context=context_client,
                 recipient_name=recipient_name,
-                attachments=attachments,
+                pdf_invoice_data=pdf_invoice_data,
                 async_send=True
             )
-            logger.info(f"[EMAIL BOUQUET] Email envoyé à {recipient_email}")
+            logger.info(f"[EMAIL BOUQUET] Email avec facture PDF envoyé à {recipient_email}")
         except Exception as mail_err:
             logger.error(f"[EMAIL BOUQUET] Erreur envoi email client {recipient_email}: {mail_err}")
 
-    # 2. Notification administrateur
+    # 2. Notification administrateur avec facture PDF jointe
     try:
         admin_emails = list(
             User.objects.filter(role__in=['admin', 'super_admin'], is_active=True)
@@ -1106,7 +1095,7 @@ def send_bouquet_subscription_emails(subscription_id: str):
                 template_name="emails/orders/admin_bouquet_alert.html",
                 context=context_admin,
                 recipient_name="Administration LAHA",
-                attachments=attachments,
+                pdf_invoice_data=pdf_invoice_data,
                 async_send=True
             )
     except Exception as adm_err:

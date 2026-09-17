@@ -19,6 +19,8 @@ import {
   InstitutionBookPreviewItem,
 } from "@/lib/services/admin";
 
+import { Pagination } from "@/components/ui/pagination";
+
 export interface BouquetBooksPreviewModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -47,19 +49,40 @@ export function BouquetBooksPreviewModal({
     title: string;
     subtitle?: string;
     books_count: number;
+    total_pages?: number;
     books: InstitutionBookPreviewItem[];
   } | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(24);
 
+  // Debounce de recherche
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedQuery(searchQuery);
+      setCurrentPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Réinitialisation à l'ouverture
   useEffect(() => {
     if (!isOpen) {
       setData(null);
       setError(null);
       setSearchQuery("");
+      setDebouncedQuery("");
+      setCurrentPage(1);
       return;
     }
+  }, [isOpen]);
+
+  // Chargement des données
+  useEffect(() => {
+    if (!isOpen) return;
 
     // Cas 1 : Ouvrages passés directement (ex: sélection sur mesure en cours)
     if (directBooks) {
@@ -67,6 +90,7 @@ export function BouquetBooksPreviewModal({
         title: directTitle || "Ouvrages sélectionnés",
         subtitle: "Sélection sur-mesure",
         books_count: directBooks.length,
+        total_pages: Math.ceil(directBooks.length / pageSize) || 1,
         books: directBooks,
       });
       setLoading(false);
@@ -74,13 +98,17 @@ export function BouquetBooksPreviewModal({
       return;
     }
 
-    // Cas 2 : ID de bouquet
+    // Cas 2 : ID de bouquet (pagination serveur)
     if (bouquetId) {
       let isMounted = true;
       setLoading(true);
       setError(null);
 
-      getBouquetOfferingBooksPreview(bouquetId)
+      getBouquetOfferingBooksPreview(bouquetId, {
+        page: currentPage,
+        page_size: pageSize,
+        q: debouncedQuery,
+      })
         .then((res) => {
           if (!isMounted) return;
           if (res) {
@@ -88,6 +116,7 @@ export function BouquetBooksPreviewModal({
               title: bouquetTitle || res.title,
               subtitle: res.target_institution_name || (res.discipline ? `Discipline : ${res.discipline}` : (res.country ? `Pays : ${res.country}` : "Catalogue")),
               books_count: res.books_count,
+              total_pages: res.total_pages || Math.ceil(res.books_count / pageSize) || 1,
               books: res.books,
             });
           } else {
@@ -122,6 +151,7 @@ export function BouquetBooksPreviewModal({
               title: institutionName || res.institution_name,
               subtitle: `Code : ${res.institution_code || "—"}`,
               books_count: res.books_count,
+              total_pages: Math.ceil(res.books_count / pageSize) || 1,
               books: res.books,
             });
           } else {
@@ -141,19 +171,47 @@ export function BouquetBooksPreviewModal({
         isMounted = false;
       };
     }
-  }, [isOpen, bouquetId, bouquetTitle, institutionId, institutionName, directBooks, directTitle]);
+  }, [isOpen, bouquetId, bouquetTitle, institutionId, institutionName, directBooks, directTitle, currentPage, pageSize, debouncedQuery]);
 
-  const filteredBooks = useMemo(() => {
+  // Ouvrages affichés
+  const displayedBooks = useMemo(() => {
     if (!data?.books) return [];
-    if (!searchQuery.trim()) return data.books;
+    if (bouquetId) {
+      // Données déjà paginées par le serveur
+      return data.books;
+    }
+    // Filtrage et pagination client pour directBooks / institutionId
+    let list = data.books;
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      list = list.filter(
+        (b) =>
+          b.title.toLowerCase().includes(q) ||
+          b.discipline.toLowerCase().includes(q) ||
+          b.authors.some((a) => a.toLowerCase().includes(q))
+      );
+    }
+    const start = (currentPage - 1) * pageSize;
+    return list.slice(start, start + pageSize);
+  }, [bouquetId, data?.books, searchQuery, currentPage, pageSize]);
+
+  const totalItems = useMemo(() => {
+    if (bouquetId) return data?.books_count ?? 0;
+    if (!data?.books) return 0;
+    if (!searchQuery.trim()) return data.books.length;
     const q = searchQuery.toLowerCase().trim();
     return data.books.filter(
       (b) =>
         b.title.toLowerCase().includes(q) ||
         b.discipline.toLowerCase().includes(q) ||
         b.authors.some((a) => a.toLowerCase().includes(q))
-    );
-  }, [data, searchQuery]);
+    ).length;
+  }, [bouquetId, data, searchQuery]);
+
+  const totalPages = useMemo(() => {
+    if (bouquetId) return data?.total_pages || Math.ceil((data?.books_count ?? 0) / pageSize) || 1;
+    return Math.ceil(totalItems / pageSize) || 1;
+  }, [bouquetId, data, totalItems, pageSize]);
 
   if (!isOpen) return null;
 
@@ -223,7 +281,15 @@ export function BouquetBooksPreviewModal({
             )}
           </div>
           <div className="text-xs text-foreground/60 shrink-0 hidden sm:block">
-            {filteredBooks.length} / {data?.books_count ?? 0} affiché(s)
+            {totalItems > 0 ? (
+              <>
+                Page <strong className="text-navy">{currentPage}</strong> sur{" "}
+                <strong className="text-navy">{totalPages}</strong> •{" "}
+                <strong className="text-gold">{totalItems}</strong> ouvrage(s)
+              </>
+            ) : (
+              "0 ouvrage"
+            )}
           </div>
         </div>
 
@@ -232,28 +298,28 @@ export function BouquetBooksPreviewModal({
           {loading ? (
             <div className="py-16 text-center space-y-3">
               <div className="w-10 h-10 mx-auto rounded-full border-2 border-gold border-t-transparent animate-spin" />
-              <p className="text-sm text-foreground/70">Chargement des ouvrages de l'université...</p>
+              <p className="text-sm text-foreground/70">Chargement des ouvrages...</p>
             </div>
           ) : error ? (
             <div className="py-12 px-4 rounded-xl border border-border bg-background-secondary/40 text-center space-y-2">
               <AlertCircle className="w-8 h-8 text-foreground/60 mx-auto" />
               <p className="text-sm text-foreground/80">{error}</p>
             </div>
-          ) : filteredBooks.length === 0 ? (
+          ) : displayedBooks.length === 0 ? (
             <div className="py-16 text-center space-y-2">
               <BookOpen className="w-10 h-10 text-foreground/40 mx-auto" />
               <p className="font-playfair font-semibold text-base text-navy">
-                {searchQuery ? "Aucun ouvrage ne correspond à votre recherche" : "Aucun ouvrage publié pour cette université"}
+                {searchQuery ? "Aucun ouvrage ne correspond à votre recherche" : "Aucun ouvrage publié pour ce bouquet"}
               </p>
               <p className="text-xs text-foreground/60 max-w-sm mx-auto">
                 {searchQuery
                   ? "Essayez de modifier vos termes de recherche."
-                  : "Dès que l'établissement ou ses enseignants publieront des ouvrages validés, ils apparaîtront automatiquement ici."}
+                  : "Dès que des ouvrages validés seront associés à ce bouquet, ils apparaîtront automatiquement ici."}
               </p>
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredBooks.map((book) => (
+              {displayedBooks.map((book) => (
                 <div
                   key={book.id}
                   className="flex gap-3 p-3 rounded-xl border border-border bg-background-secondary/30 hover:border-gold/40 hover:bg-background-secondary/60 transition-all group"
@@ -313,6 +379,26 @@ export function BouquetBooksPreviewModal({
             </div>
           )}
         </div>
+
+        {/* Barre de navigation / Pagination */}
+        {totalPages > 1 && (
+          <div className="px-4 sm:px-6 py-2 border-t border-border bg-background shrink-0">
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={totalItems}
+              pageSize={pageSize}
+              onPageChange={(p) => setCurrentPage(p)}
+              onPageSizeChange={(s) => {
+                setPageSize(s);
+                setCurrentPage(1);
+              }}
+              pageSizeOptions={[12, 24, 48, 96]}
+              showTotalCount={true}
+              itemLabel="ouvrages"
+            />
+          </div>
+        )}
 
         {/* Pied de page */}
         <div className="p-4 border-t border-border bg-background-secondary/30 flex items-center justify-between">

@@ -101,6 +101,7 @@ export default function AdminBouquetsPage() {
 
   // Auxiliary data
   const [catalogBooks, setCatalogBooks] = useState<Book[]>([]);
+  const [catalogTotalCount, setCatalogTotalCount] = useState<number>(0);
   const [institutions, setInstitutions] = useState<{ id: string; name: string }[]>([]);
 
   const loadData = async () => {
@@ -149,7 +150,11 @@ export default function AdminBouquetsPage() {
   useEffect(() => {
     loadData();
     loadInstitutions();
-    searchBooks({ page_size: 5000 }).then((books) => setCatalogBooks(books)).catch(() => {});
+    searchCatalogBooks({ page_size: 1 }).then((res) => {
+      if (res && typeof res.count === 'number') {
+        setCatalogTotalCount(res.count);
+      }
+    }).catch(() => {});
     getDisciplines().then((d) => setDbDisciplines(d)).catch(() => {});
   }, []);
 
@@ -804,7 +809,7 @@ export default function AdminBouquetsPage() {
                     <div className="flex items-center gap-2 text-xs">
                       <BookOpen className="w-4 h-4 text-gold" />
                       <span className="text-navy font-semibold">
-                        {institutionLiveCount ?? catalogBooks.length} ouvrage(s) dans le catalogue intégral
+                        {institutionLiveCount ?? catalogTotalCount} ouvrage(s) dans le catalogue intégral
                       </span>
                     </div>
                     <button
@@ -812,7 +817,7 @@ export default function AdminBouquetsPage() {
                       onClick={async () => {
                         setPreviewDirectTitle("Bouquet Général (Catalogue Intégral)");
                         try {
-                          const res = await searchCatalogBooks({ page_size: 5000 });
+                          const res = await searchCatalogBooks({ page_size: 100 });
                           if (res && res.results && res.results.length > 0) {
                             setPreviewDirectBooks(res.results.map((b) => ({
                               id: b.id,
@@ -902,7 +907,7 @@ export default function AdminBouquetsPage() {
                         onClick={async () => {
                           setPreviewDirectTitle(`Discipline : ${discipline}`);
                           try {
-                            const res = await searchCatalogBooks({ discipline: discipline.trim(), page_size: 5000 });
+                            const res = await searchCatalogBooks({ discipline: discipline.trim(), page_size: 100 });
                             if (res && res.results && res.results.length > 0) {
                               setPreviewDirectBooks(res.results.map((b) => ({
                                 id: b.id,
@@ -1037,7 +1042,7 @@ export default function AdminBouquetsPage() {
                         const countryLabel = WEST_AFRICAN_COUNTRIES.find((c) => c.code === country)?.label || country;
                         setPreviewDirectTitle(`Pays : ${countryLabel}`);
                         try {
-                          const res = await searchCatalogBooks({ country, page_size: 5000 });
+                          const res = await searchCatalogBooks({ country, page_size: 100 });
                           if (res && res.results && res.results.length > 0) {
                             setPreviewDirectBooks(res.results.map((b) => ({
                               id: b.id,

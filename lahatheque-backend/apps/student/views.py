@@ -149,6 +149,22 @@ def _compute_reading_streak(user) -> int:
     return streak
 
 
+STUDENT_BOOKS_CACHE_TTL = 300  # 5 minutes
+
+
+def get_student_books_cache_key(user_id: int, query_params: dict) -> str:
+    version = cache.get(f"student_books_v_{user_id}") or 1
+    raw_key = f"student_books:{user_id}:v{version}:{sorted(query_params.items())}"
+    return "student_books:" + hashlib.md5(raw_key.encode()).hexdigest()
+
+
+def invalidate_student_books_cache(user_id: int):
+    try:
+        cache.incr(f"student_books_v_{user_id}")
+    except Exception:
+        cache.set(f"student_books_v_{user_id}", 2, 86400 * 30)
+
+
 # ─── Ma Bibliothèque ───────────────────────────────────────────────────────────
 
 class StudentBooksView(APIView):
@@ -164,9 +180,18 @@ class StudentBooksView(APIView):
 
     def get(self, request):
         user = request.user
+
+        # Cache Redis par utilisateur + paramètres de filtre
+        cache_key = get_student_books_cache_key(user.id, dict(request.query_params))
+        try:
+            cached = cache.get(cache_key)
+            if cached is not None:
+                return Response(cached)
+        except Exception:
+            pass
+
         format_filter = request.query_params.get('book_format') or request.query_params.get('format')
         favorites_only = request.query_params.get('favorites') == 'true'
-        from apps.protection.access_service import AccessService
 
         qs = (
             ReadingProgress.objects
@@ -175,7 +200,11 @@ class StudentBooksView(APIView):
                 'ouvrage', 'ouvrage__discipline',
                 'ouvrage__publisher', 'ouvrage__institution'
             )
-            .prefetch_related('ouvrage__authors')
+            .prefetch_related(
+                'ouvrage__authors',
+                'ouvrage__language_versions',
+                'ouvrage__audio_tracks',
+            )
             .order_by('-last_read_at')
         )
 
@@ -260,15 +289,92 @@ class StudentBooksView(APIView):
             except BouquetOffering.DoesNotExist:
                 continue
 
-        data = []
-        processed_book_ids = set()
+        # Bouquets universitaires par affiliation
+        active_affiliations = list(
+            StudentAffiliation.objects.filter(student=user, status='approved')
+            .select_related('institution')
+            .values_list('institution_id', flat=True)
+        )
+        if active_affiliations:
+            uni_subs = UniversityBouquetSubscription.objects.filter(
+                institution_id__in=active_affiliations,
+                status='active',
+                start_date__lte=today,
+                end_date__gte=today
+            )
+            for usub in uni_subs:
+                if usub.offering_id:
+                    try:
+                        offering = BouquetOffering.objects.get(id=usub.offering_id, is_active=True)
+                        for ub_id in offering.get_books_queryset(requesting_institution=usub.institution).values_list('id', flat=True):
+                            ub_id_str = str(ub_id)
+                            if ub_id_str not in bouquet_books_map:
+                                bouquet_books_map[ub_id_str] = {
+                                    "bouquet_name": usub.title or offering.name,
+                                    "bouquet_id": str(usub.id),
+                                    "bouquet_end_date": usub.end_date.strftime("%d/%m/%Y") if usub.end_date else None,
+                                    "expires_at": usub.end_date.isoformat() if usub.end_date else None,
+                                    "expires_in_days": max(0, (usub.end_date - today).days) if usub.end_date else None,
+                                }
+                    except BouquetOffering.DoesNotExist:
+                        continue
 
-        for progress in qs:
+        # Ensemble total des IDs avec accès numérique autorisé
+        digital_access_ids = (
+            True if is_platform_admin
+            else (user_digital_ids.union(set(bouquet_books_map.keys())))
+        )
+
+        # Identification des livres de bouquets non encore entamés
+        progress_books = list(qs)
+        processed_book_ids = {str(p.ouvrage.id) for p in progress_books}
+        unopened_bouquet_book_ids = set(bouquet_books_map.keys()) - processed_book_ids
+
+        unopened_books = []
+        if unopened_bouquet_book_ids:
+            from apps.catalog.models import Ouvrage
+            unopened_books = list(
+                Ouvrage.objects.filter(
+                    id__in=unopened_bouquet_book_ids,
+                    status='published'
+                )
+                .select_related('discipline', 'publisher', 'institution')
+                .prefetch_related(
+                    'authors',
+                    'language_versions',
+                    'audio_tracks',
+                )
+            )
+
+        # Pré-chargement des stocks en 1 seule requête SQL groupée (anti-N+1)
+        all_book_ids = {p.ouvrage_id for p in progress_books}.union({b.id for b in unopened_books})
+        stock_map = {}
+        if all_book_ids:
+            from apps.commerce.models import StockOuvrage
+            from django.db.models import Sum, F
+            stock_data = (
+                StockOuvrage.objects
+                .filter(ouvrage_id__in=all_book_ids)
+                .values('ouvrage_id')
+                .annotate(total=Sum(F('quantite_reelle') - F('quantite_reservee')))
+            )
+            for item in stock_data:
+                bid = item['ouvrage_id']
+                qty = max(0, item['total'] or 0)
+                stock_map[bid] = qty
+                stock_map[str(bid)] = qty
+
+        data = []
+
+        # 1. Traitement des ouvrages avec progression
+        for progress in progress_books:
             book_id_str = str(progress.ouvrage.id)
-            processed_book_ids.add(book_id_str)
-            access_info = AccessService.check_user_book_access(user, book_id_str)
-            has_digital_access = bool(access_info.get("access_granted"))
-            has_audio_access = (user_audio_ids is True) or (book_id_str in user_audio_ids)
+            has_digital_access = (
+                is_platform_admin or (digital_access_ids is True) or (book_id_str in digital_access_ids)
+            )
+            has_audio_access = (
+                (user_audio_ids is True) or (book_id_str in user_audio_ids)
+            )
 
             # Si l'utilisateur n'a ni accès numérique ni accès audio, ignorer
             if not has_digital_access and not has_audio_access:
@@ -283,12 +389,22 @@ class StudentBooksView(APIView):
                 context={
                     'request': request,
                     'user_audio_ids': user_audio_ids,
-                    'user_digital_ids': user_digital_ids if not is_platform_admin else True,
+                    'user_digital_ids': digital_access_ids,
+                    'stock_map': stock_map,
                 }
             ).data
 
             is_bouquet = book_id_str in bouquet_books_map
             b_meta = bouquet_books_map.get(book_id_str, {})
+
+            if is_platform_admin:
+                acc_type = "privilege_access"
+            elif is_bouquet:
+                acc_type = "client_bouquet_subscription"
+            elif (user_digital_ids is True) or (book_id_str in user_digital_ids):
+                acc_type = "purchased"
+            else:
+                acc_type = "audio_purchase"
 
             data.append({
                 **ouvrage_data,
@@ -302,55 +418,48 @@ class StudentBooksView(APIView):
                 'last_read_at': progress.last_read_at,
                 'is_completed': (progress.is_completed or progress_pct >= 100) if has_digital_access else False,
                 'is_favorite': progress.is_favorite,
-                'access_type': access_info.get("reason", "purchased") if has_digital_access else "audio_purchase",
-                'expires_at': access_info.get("expires_at") or b_meta.get("expires_at"),
-                'expires_in_days': access_info.get("expires_in_days") or b_meta.get("expires_in_days"),
+                'access_type': acc_type,
+                'expires_at': b_meta.get("expires_at"),
+                'expires_in_days': b_meta.get("expires_in_days"),
                 'is_bouquet_book': is_bouquet,
                 'bouquet_name': b_meta.get("bouquet_name"),
                 'bouquet_id': b_meta.get("bouquet_id"),
                 'bouquet_end_date': b_meta.get("bouquet_end_date"),
             })
 
-        # Inclure les livres de bouquets non encore ouverts (sans ReadingProgress)
-        unopened_bouquet_book_ids = set(bouquet_books_map.keys()) - processed_book_ids
-        if unopened_bouquet_book_ids:
-            from apps.catalog.models import Ouvrage
-            unopened_books = Ouvrage.objects.filter(
-                id__in=unopened_bouquet_book_ids,
-                status='published'
-            ).select_related('discipline', 'publisher', 'institution').prefetch_related('authors')
-
-            for b in unopened_books:
-                b_str_id = str(b.id)
-                b_meta = bouquet_books_map.get(b_str_id, {})
-                ov_data = OuvrageBasicSerializer(
-                    b,
-                    context={
-                        'request': request,
-                        'user_audio_ids': user_audio_ids,
-                        'user_digital_ids': True,
-                    }
-                ).data
-                data.append({
-                    **ov_data,
-                    'is_owned': True,
-                    'has_digital_access': True,
-                    'is_audio_owned': False,
-                    'has_audio_access': False,
-                    'progress_percent': 0,
-                    'current_page': 0,
-                    'last_read_chapter': '',
-                    'last_read_at': None,
-                    'is_completed': False,
-                    'is_favorite': False,
-                    'access_type': 'client_bouquet_subscription',
-                    'expires_at': b_meta.get("expires_at"),
-                    'expires_in_days': b_meta.get("expires_in_days"),
-                    'is_bouquet_book': True,
-                    'bouquet_name': b_meta.get("bouquet_name"),
-                    'bouquet_id': b_meta.get("bouquet_id"),
-                    'bouquet_end_date': b_meta.get("bouquet_end_date"),
-                })
+        # 2. Traitement des ouvrages de bouquets non encore ouverts (sans progression)
+        for b in unopened_books:
+            b_str_id = str(b.id)
+            b_meta = bouquet_books_map.get(b_str_id, {})
+            ov_data = OuvrageBasicSerializer(
+                b,
+                context={
+                    'request': request,
+                    'user_audio_ids': user_audio_ids,
+                    'user_digital_ids': True,
+                    'stock_map': stock_map,
+                }
+            ).data
+            data.append({
+                **ov_data,
+                'is_owned': True,
+                'has_digital_access': True,
+                'is_audio_owned': False,
+                'has_audio_access': False,
+                'progress_percent': 0,
+                'current_page': 0,
+                'last_read_chapter': '',
+                'last_read_at': None,
+                'is_completed': False,
+                'is_favorite': False,
+                'access_type': 'client_bouquet_subscription',
+                'expires_at': b_meta.get("expires_at"),
+                'expires_in_days': b_meta.get("expires_in_days"),
+                'is_bouquet_book': True,
+                'bouquet_name': b_meta.get("bouquet_name"),
+                'bouquet_id': b_meta.get("bouquet_id"),
+                'bouquet_end_date': b_meta.get("bouquet_end_date"),
+            })
 
         # Filtrage par onglet (format_filter ou tab)
         tab_param = request.query_params.get('tab')
@@ -359,7 +468,13 @@ class StudentBooksView(APIView):
         elif tab_param == 'purchased':
             data = [d for d in data if not d.get('is_bouquet_book')]
 
-        return Response({'success': True, 'data': data, 'error': None})
+        payload = {'success': True, 'data': data, 'error': None}
+        try:
+            cache.set(cache_key, payload, STUDENT_BOOKS_CACHE_TTL)
+        except Exception:
+            pass
+
+        return Response(payload)
 
 
 class StudentBookDetailView(APIView):
@@ -413,6 +528,7 @@ class StudentToggleFavoriteView(APIView):
         )
         progress.is_favorite = not progress.is_favorite
         progress.save(update_fields=['is_favorite'])
+        invalidate_student_books_cache(user.id)
 
         return Response({
             'success': True,
@@ -524,6 +640,8 @@ class StudentUpdateReadingProgressView(APIView):
                 )
         except Exception as trace_err:
             logger.warning(f"Erreur synchronisation TraceAcces depuis progress: {trace_err}")
+
+        invalidate_student_books_cache(user.id)
 
         return Response({
             'success': True,
