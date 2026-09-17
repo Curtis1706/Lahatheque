@@ -28,6 +28,11 @@ export async function GET(
     headers.set('Authorization', authHeader);
   }
 
+  const rawCookie = request.headers.get('cookie');
+  if (rawCookie) {
+    headers.set('Cookie', rawCookie);
+  }
+
   const rangeHeader = request.headers.get('range');
   if (rangeHeader) {
     headers.set('Range', rangeHeader);
@@ -58,6 +63,7 @@ export async function GET(
       responseHeaders.set('Content-Type', 'application/octet-stream');
       responseHeaders.set('Content-Disposition', 'inline; filename="document.bin"');
       responseHeaders.set('Accept-Ranges', 'bytes');
+      responseHeaders.set('Access-Control-Expose-Headers', 'Accept-Ranges, Content-Range, Content-Length');
       responseHeaders.set('Cache-Control', 'private, no-store, must-revalidate');
       responseHeaders.set('X-Content-Type-Options', 'nosniff');
 

@@ -420,9 +420,10 @@ export const FlipBookReader: React.FC<FlipBookProps> = ({
           pdfSource = {
             url: absoluteUrl,
             withCredentials: true,
-            rangeChunkSize: 65536, // Streaming par blocs de 64 Ko
-            disableAutoFetch: true, // Évite de télécharger tout le document en avance
-            disableStream: false,  // Active le streaming par morceaux HTTP 206
+            rangeChunkSize: 131072, // Streaming haute performance par fragments de 128 Ko
+            disableAutoFetch: true, // Évite de précharger inutilement tout le document
+            disableStream: true,    // Active le vrai découpage par fragments HTTP 206 RFC 7233 sans télécharger tout le PDF
+            disableRange: false,    // Autorise expressément les requêtes Range partielles
           };
         } else if (typeof fileUrl === 'object' && fileUrl !== null) {
           pdfSource = { data: fileUrl };
@@ -439,6 +440,9 @@ export const FlipBookReader: React.FC<FlipBookProps> = ({
         setNumPages(total);
         setPages(new Array(total).fill(''));
         onDocumentLoadRef.current?.(total);
+
+        // Déverrouillage immédiat de la vue : la liseuse 3D s'affiche sans bloquer
+        setIsLoading(false);
 
         const initialWindow = getPageRenderWindow(initialPageRef.current, total);
         
@@ -458,9 +462,6 @@ export const FlipBookReader: React.FC<FlipBookProps> = ({
           });
           return next;
         });
-        
-        // Libération instantanée de l'overlay de chargement
-        setIsLoading(false);
 
         // Préchargement asynchrone non-bloquant des pages adjacentes
         const remainingIndices: number[] = [];
