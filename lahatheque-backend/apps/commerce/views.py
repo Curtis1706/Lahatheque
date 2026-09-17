@@ -778,7 +778,7 @@ class ClientBouquetListView(APIView):
                         cover_url = bk.cover_image.url
                     except Exception:
                         cover_url = None
-                authors_list = [a.name for a in bk.authors.all()]
+                authors_list = [f"{a.first_name} {a.last_name}".strip() for a in bk.authors.all() if f"{a.first_name} {a.last_name}".strip()]
                 author_display = ", ".join(authors_list) if authors_list else "Auteur académique"
                 books_data.append({
                     "id": str(bk.id),

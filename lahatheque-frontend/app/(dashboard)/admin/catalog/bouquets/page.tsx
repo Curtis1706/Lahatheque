@@ -79,6 +79,10 @@ export default function AdminBouquetsPage() {
   const [selectedSubscribersBouquet, setSelectedSubscribersBouquet] = useState<BouquetOfferingAdmin | null>(null);
   const [previewInstitutionId, setPreviewInstitutionId] = useState<string | null>(null);
   const [previewInstitutionName, setPreviewInstitutionName] = useState<string>("");
+  const [previewBouquetId, setPreviewBouquetId] = useState<string | null>(null);
+  const [previewBouquetTitle, setPreviewBouquetTitle] = useState<string>("");
+  const [previewDirectBooks, setPreviewDirectBooks] = useState<any[] | null>(null);
+  const [previewDirectTitle, setPreviewDirectTitle] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
 
   // Form State
@@ -112,37 +116,91 @@ export default function AdminBouquetsPage() {
     }
   };
 
+  const loadInstitutions = async () => {
+    try {
+      const res = await fetch("/api/bff/partners/institutions/", {
+        credentials: "include",
+        cache: "no-store",
+      });
+      if (res.ok) {
+        const json = await res.json();
+        const list = Array.isArray(json) ? json : (json?.data || json?.results || []);
+        if (Array.isArray(list) && list.length > 0) {
+          // Prioriser les universités partenaires ayants droit (UAC, UP, UNSTIM, UNA, etc.)
+          const partnerInstitutions = list.filter(
+            (i: any) =>
+              i.institution_type === "partner" ||
+              ["UAC", "UP", "UNSTIM", "UNA"].includes((i.code || "").toUpperCase())
+          );
+          const activeList = partnerInstitutions.length > 0 ? partnerInstitutions : list;
+          setInstitutions(
+            activeList.map((i: any) => ({
+              id: String(i.id),
+              name: i.name ? `${i.name}${i.code ? ` (${i.code})` : ""}` : (i.title || "Université Partenaire"),
+            }))
+          );
+        }
+      }
+    } catch (err) {
+      console.error("[ADMIN BOUQUETS] Erreur chargement universités:", err);
+    }
+  };
+
   useEffect(() => {
     loadData();
-    searchBooks({}).then((books) => setCatalogBooks(books)).catch(() => {});
+    loadInstitutions();
+    searchBooks({ page_size: 2000 }).then((books) => setCatalogBooks(books)).catch(() => {});
     getDisciplines().then((d) => setDbDisciplines(d)).catch(() => {});
-    fetch("/api/bff/partners/institutions/", { credentials: "include" })
-      .then((res) => (res.ok ? res.json() : []))
-      .then((data) => {
-        const list = Array.isArray(data) ? data : data.results || [];
-        setInstitutions(list.map((i: any) => ({ id: String(i.id), name: i.name || i.title || "Université" })));
-      })
-      .catch(() => {});
   }, []);
 
-  // Décompte dynamique en temps réel pour l'université sélectionnée
   useEffect(() => {
-    if (bouquetType === "university" && targetInstitution) {
-      setInstitutionLoadingCount(true);
-      getInstitutionBooksPreview(targetInstitution)
-        .then((res) => {
-          setInstitutionLiveCount(res ? res.books_count : 0);
-        })
-        .catch(() => {
-          setInstitutionLiveCount(0);
-        })
-        .finally(() => {
-          setInstitutionLoadingCount(false);
-        });
-    } else {
-      setInstitutionLiveCount(null);
+    if (isModalOpen && institutions.length === 0) {
+      loadInstitutions();
     }
-  }, [bouquetType, targetInstitution]);
+  }, [isModalOpen, institutions.length]);
+
+  // Décompte dynamique et liste en temps réel selon le type de bouquet sélectionné dans la modale
+  useEffect(() => {
+    if (!isModalOpen) return;
+
+    if (bouquetType === "university") {
+      if (targetInstitution) {
+        setInstitutionLoadingCount(true);
+        getInstitutionBooksPreview(targetInstitution)
+          .then((res) => {
+            setInstitutionLiveCount(res ? res.books_count : 0);
+          })
+          .catch(() => {
+            setInstitutionLiveCount(0);
+          })
+          .finally(() => {
+            setInstitutionLoadingCount(false);
+          });
+      } else {
+        setInstitutionLiveCount(null);
+      }
+    } else if (bouquetType === "discipline") {
+      if (discipline.trim()) {
+        const discLower = discipline.toLowerCase().trim();
+        const matched = catalogBooks.filter((b) => {
+          const bDisc = (b.discipline_detail?.name || "").toLowerCase().trim();
+          return bDisc.includes(discLower) || discLower.includes(bDisc);
+        });
+        setInstitutionLiveCount(matched.length);
+      } else {
+        setInstitutionLiveCount(0);
+      }
+    } else if (bouquetType === "country") {
+      if (country) {
+        const matched = catalogBooks.filter((b) => (b.country || "").toUpperCase() === country.toUpperCase());
+        setInstitutionLiveCount(matched.length);
+      } else {
+        setInstitutionLiveCount(0);
+      }
+    } else if (bouquetType === "custom") {
+      setInstitutionLiveCount(selectedBookIds.length);
+    }
+  }, [isModalOpen, bouquetType, targetInstitution, discipline, country, selectedBookIds.length, catalogBooks]);
 
   const handleTypeFilterChange = (newType: string) => {
     setTypeFilter(newType);
@@ -349,22 +407,28 @@ export default function AdminBouquetsPage() {
       header: "Contenu Réel",
       cell: (row) => (
         <div className="text-xs space-y-1 font-poppins">
-          <span className="inline-flex items-center gap-1 font-mono font-bold text-navy bg-background-secondary px-2.5 py-1 rounded-lg border border-border">
-            <BookOpen className="w-3.5 h-3.5 text-gold" />
-            {row.books_count.toLocaleString("fr-FR")} livre(s)
-          </span>
-          {row.bouquet_type === "university" && row.target_institution && (
-            <button
-              type="button"
-              onClick={() => {
-                setPreviewInstitutionId(row.target_institution);
-                setPreviewInstitutionName(row.target_institution_name || institutions.find((i) => i.id === row.target_institution)?.name || "");
-              }}
-              className="block text-[10px] text-gold hover:underline font-medium"
-            >
-              Voir la liste &amp; couvertures
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => {
+              setPreviewBouquetId(row.id);
+              setPreviewBouquetTitle(row.title);
+            }}
+            title="Inspecter la liste des ouvrages et couvertures"
+            className="inline-flex items-center gap-1 font-mono font-bold text-navy bg-background-secondary hover:bg-gold/10 hover:border-gold/40 px-2.5 py-1 rounded-lg border border-border transition-colors cursor-pointer group"
+          >
+            <BookOpen className="w-3.5 h-3.5 text-gold group-hover:scale-110 transition-transform" />
+            <span>{row.books_count.toLocaleString("fr-FR")} livre(s)</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setPreviewBouquetId(row.id);
+              setPreviewBouquetTitle(row.title);
+            }}
+            className="block text-[10px] text-gold hover:underline font-medium cursor-pointer"
+          >
+            Voir la liste &amp; couvertures
+          </button>
         </div>
       ),
     },
@@ -725,6 +789,44 @@ export default function AdminBouquetsPage() {
                       className="w-full px-3.5 py-2.5 text-xs bg-background border border-border rounded-xl text-navy focus:outline-none focus:border-gold min-h-[44px]"
                     />
                   </div>
+
+                  {discipline.trim() && (
+                    <div className="flex flex-wrap items-center justify-between gap-2 p-3 rounded-lg bg-gold/5 border border-gold/20">
+                      <div className="flex items-center gap-2 text-xs">
+                        <BookOpen className="w-4 h-4 text-gold" />
+                        <span className="text-navy font-semibold">
+                          {institutionLiveCount ?? 0} ouvrage(s) dans cette discipline
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const discLower = discipline.toLowerCase().trim();
+                          const matched = catalogBooks.filter((b) => {
+                            const bDisc = (b.discipline_detail?.name || "").toLowerCase().trim();
+                            return bDisc.includes(discLower) || discLower.includes(bDisc);
+                          }).map((b) => ({
+                            id: b.id,
+                            title: b.title,
+                            authors: (b.authors_details || []).map((a) => `${a.first_name} ${a.last_name}`.trim()),
+                            isbn: b.isbn,
+                            cover_url: b.cover_url || b.cover_image,
+                            discipline: b.discipline_detail?.name || discipline,
+                            format_type: b.format_type,
+                            price_digital: b.price_digital || 0,
+                            publication_year: b.publication_year,
+                          }));
+                          setPreviewDirectBooks(matched);
+                          setPreviewDirectTitle(`Discipline : ${discipline}`);
+                        }}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-navy text-white text-xs font-medium hover:bg-navy-hover transition-colors cursor-pointer"
+                      >
+                        <Eye className="w-3.5 h-3.5 text-gold" />
+                        <span>Inspecter les livres &amp; couvertures</span>
+                      </button>
+                    </div>
+                  )}
+
                   <p className="text-[10px] text-foreground/60">
                     Tous les ouvrages publiés rattachés à cette discipline seront inclus automatiquement.
                   </p>
@@ -771,7 +873,7 @@ export default function AdminBouquetsPage() {
                           setPreviewInstitutionId(targetInstitution);
                           setPreviewInstitutionName(institutions.find((i) => i.id === targetInstitution)?.name || "");
                         }}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-navy text-white text-xs font-medium hover:bg-navy-hover transition-colors"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-navy text-white text-xs font-medium hover:bg-navy-hover transition-colors cursor-pointer"
                       >
                         <Eye className="w-3.5 h-3.5 text-gold" />
                         <span>Inspecter les livres &amp; couvertures</span>
@@ -786,21 +888,56 @@ export default function AdminBouquetsPage() {
               )}
 
               {bouquetType === "country" && (
-                <div className="space-y-1.5 p-4 rounded-xl bg-background-secondary/30 border border-border">
-                  <label className="block text-xs font-bold text-navy">
-                    Pays de Rattachement <span className="text-gold">*</span>
-                  </label>
-                  <select
-                    value={country}
-                    onChange={(e) => setCountry(e.target.value)}
-                    className="w-full px-3.5 py-2.5 text-xs bg-background border border-border rounded-xl text-navy font-semibold focus:outline-none focus:border-gold min-h-[44px]"
-                  >
-                    {WEST_AFRICAN_COUNTRIES.map((c) => (
-                      <option key={c.code} value={c.code}>
-                        {c.label}
-                      </option>
-                    ))}
-                  </select>
+                <div className="space-y-3 p-4 rounded-xl bg-background-secondary/30 border border-border">
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-bold text-navy">
+                      Pays de Rattachement <span className="text-gold">*</span>
+                    </label>
+                    <select
+                      value={country}
+                      onChange={(e) => setCountry(e.target.value)}
+                      className="w-full px-3.5 py-2.5 text-xs bg-background border border-border rounded-xl text-navy font-semibold focus:outline-none focus:border-gold min-h-[44px]"
+                    >
+                      {WEST_AFRICAN_COUNTRIES.map((c) => (
+                        <option key={c.code} value={c.code}>
+                          {c.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="flex flex-wrap items-center justify-between gap-2 p-3 rounded-lg bg-gold/5 border border-gold/20">
+                    <div className="flex items-center gap-2 text-xs">
+                      <BookOpen className="w-4 h-4 text-gold" />
+                      <span className="text-navy font-semibold">
+                        {institutionLiveCount ?? 0} ouvrage(s) rattaché(s) à ce pays
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const matched = catalogBooks.filter((b) => (b.country || "").toUpperCase() === country.toUpperCase()).map((b) => ({
+                          id: b.id,
+                          title: b.title,
+                          authors: (b.authors_details || []).map((a) => `${a.first_name} ${a.last_name}`.trim()),
+                          isbn: b.isbn,
+                          cover_url: b.cover_url || b.cover_image,
+                          discipline: b.discipline_detail?.name || "",
+                          format_type: b.format_type,
+                          price_digital: b.price_digital || 0,
+                          publication_year: b.publication_year,
+                        }));
+                        setPreviewDirectBooks(matched);
+                        const countryLabel = WEST_AFRICAN_COUNTRIES.find((c) => c.code === country)?.label || country;
+                        setPreviewDirectTitle(`Pays : ${countryLabel}`);
+                      }}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-navy text-white text-xs font-medium hover:bg-navy-hover transition-colors cursor-pointer"
+                    >
+                      <Eye className="w-3.5 h-3.5 text-gold" />
+                      <span>Inspecter les livres &amp; couvertures</span>
+                    </button>
+                  </div>
+
                   <p className="text-[10px] text-foreground/60">
                     Regroupe tous les ouvrages édités dans le pays sélectionné.
                   </p>
@@ -808,13 +945,46 @@ export default function AdminBouquetsPage() {
               )}
 
               {bouquetType === "custom" && (
-                <div className="p-4 rounded-xl bg-background-secondary/30 border border-border">
+                <div className="space-y-3 p-4 rounded-xl bg-background-secondary/30 border border-border">
                   <BookMultiCombobox
                     books={catalogBooks}
                     selectedBookIds={selectedBookIds}
                     onChange={setSelectedBookIds}
                     placeholder="Rechercher et cocher des ouvrages du catalogue..."
                   />
+
+                  {selectedBookIds.length > 0 && (
+                    <div className="flex flex-wrap items-center justify-between gap-2 p-3 rounded-lg bg-gold/5 border border-gold/20">
+                      <div className="flex items-center gap-2 text-xs">
+                        <BookOpen className="w-4 h-4 text-gold" />
+                        <span className="text-navy font-semibold">
+                          {selectedBookIds.length} ouvrage(s) sélectionné(s)
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const matched = catalogBooks.filter((b) => selectedBookIds.includes(b.id)).map((b) => ({
+                            id: b.id,
+                            title: b.title,
+                            authors: (b.authors_details || []).map((a) => `${a.first_name} ${a.last_name}`.trim()),
+                            isbn: b.isbn,
+                            cover_url: b.cover_url || b.cover_image,
+                            discipline: b.discipline_detail?.name || "",
+                            format_type: b.format_type,
+                            price_digital: b.price_digital || 0,
+                            publication_year: b.publication_year,
+                          }));
+                          setPreviewDirectBooks(matched);
+                          setPreviewDirectTitle(title || "Bouquet Sur-mesure");
+                        }}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-navy text-white text-xs font-medium hover:bg-navy-hover transition-colors cursor-pointer"
+                      >
+                        <Eye className="w-3.5 h-3.5 text-gold" />
+                        <span>Inspecter les livres &amp; couvertures ({selectedBookIds.length})</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -909,13 +1079,21 @@ export default function AdminBouquetsPage() {
 
       {/* Modale d'inspection des livres avec couvertures (T009) */}
       <BouquetBooksPreviewModal
-        isOpen={!!previewInstitutionId}
+        isOpen={!!previewBouquetId || !!previewInstitutionId || !!previewDirectBooks}
         onClose={() => {
+          setPreviewBouquetId(null);
+          setPreviewBouquetTitle("");
           setPreviewInstitutionId(null);
           setPreviewInstitutionName("");
+          setPreviewDirectBooks(null);
+          setPreviewDirectTitle("");
         }}
+        bouquetId={previewBouquetId}
+        bouquetTitle={previewBouquetTitle}
         institutionId={previewInstitutionId}
         institutionName={previewInstitutionName}
+        directBooks={previewDirectBooks}
+        directTitle={previewDirectTitle}
       />
 
       {/* Tiroir d'audit des abonnés (T011) */}

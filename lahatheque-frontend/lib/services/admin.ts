@@ -1413,6 +1413,34 @@ export async function getInstitutionBooksPreview(institutionId: string): Promise
   return null;
 }
 
+export interface BouquetOfferingBooksPreviewResponse {
+  id: string;
+  title: string;
+  bouquet_type: string;
+  discipline: string;
+  country: string;
+  target_institution?: string | null;
+  target_institution_name?: string | null;
+  books_count: number;
+  books: InstitutionBookPreviewItem[];
+}
+
+export async function getBouquetOfferingBooksPreview(bouquetId: string): Promise<BouquetOfferingBooksPreviewResponse | null> {
+  try {
+    const res = await fetch(`/api/bff/reporting/bouquet-offerings/${bouquetId}/`, {
+      credentials: "include",
+      cache: "no-store",
+    });
+    if (res.ok) {
+      const json = await res.json();
+      return json.data || null;
+    }
+  } catch (err) {
+    console.error("[getBouquetOfferingBooksPreview] Error:", err);
+  }
+  return null;
+}
+
 // =========================================================================
 // SOUMISSIONS DE MANUSCRITS PUBLICS (LEADS)
 // =========================================================================

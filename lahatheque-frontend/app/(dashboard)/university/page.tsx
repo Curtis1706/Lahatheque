@@ -40,16 +40,30 @@ export default function UniversityOverviewPage() {
   useEffect(() => {
     async function loadData() {
       setLoading(true);
-      const [kpiData, bqData, facData] = await Promise.all([
-        getUniversityKpis(),
-        getUniversityBouquets(),
-        getUniversityFaculties(),
-      ]);
-      setKpis(kpiData);
-      setBouquets(bqData);
-      setFaculties(facData);
-      setLoading(false);
-      console.info("[UNIV KPIS]", new Date().toISOString(), "- Établissement chargé :", kpiData?.institution_code, "Type :", kpiData?.institution_type);
+      try {
+        const [kpiData, bqData, facData] = await Promise.all([
+          getUniversityKpis().catch((err) => {
+            console.error("[UNIV OVERVIEW] Erreur chargement KPIs:", err);
+            return null;
+          }),
+          getUniversityBouquets().catch((err) => {
+            console.error("[UNIV OVERVIEW] Erreur chargement Bouquets:", err);
+            return [];
+          }),
+          getUniversityFaculties().catch((err) => {
+            console.error("[UNIV OVERVIEW] Erreur chargement Facultés:", err);
+            return [];
+          }),
+        ]);
+        if (kpiData) setKpis(kpiData);
+        if (bqData) setBouquets(bqData);
+        if (facData) setFaculties(facData);
+        console.info("[UNIV KPIS]", new Date().toISOString(), "- Établissement chargé :", kpiData?.institution_code, "Type :", kpiData?.institution_type);
+      } catch (err) {
+        console.error("[UNIV OVERVIEW] Erreur critique chargement données:", err);
+      } finally {
+        setLoading(false);
+      }
     }
     loadData();
   }, []);

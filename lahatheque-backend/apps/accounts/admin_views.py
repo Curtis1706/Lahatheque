@@ -277,28 +277,14 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
                         "error": "Un compte de rôle Université Partenaire doit obligatoirement être rattaché à une institution partenaire officielle."
                     }, status=status.HTTP_400_BAD_REQUEST)
 
-                user = User.objects.create_user(
-                    username=email,
-                    email=email,
-                    password=temp_password,
-                    first_name=data.get('first_name', '').strip(),
-                    last_name=data.get('last_name', '').strip(),
-                    phone=phone,
-                    country=data.get('country', 'BJ'),
-                    role=data['role'],
-                    active_roles=[data['role']],
-                    institution=institution,
-                    is_verified=True,
-                )
-
                 # T017 : Unicité stricte du compte modérateur par institution
-                # Si l'institution possède déjà un modérateur actif, bloquer la création
+                # Si l'institution possède déjà un modérateur actif, bloquer la création AVANT de créer l'utilisateur
                 if institution and data['role'] == 'university':
                     existing_moderator = User.objects.filter(
                         institution=institution,
                         role='university',
                         is_active=True
-                    ).exclude(pk=None).first()  # exclude(pk=None) = toujours vrai, sert de no-op pour clarté
+                    ).first()
                     if existing_moderator:
                         return Response({
                             "success": False,
@@ -312,6 +298,20 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
                                 "(Règle SC-002). Désactivez d'abord le compte existant si un remplacement est nécessaire."
                             )
                         }, status=status.HTTP_409_CONFLICT)
+
+                user = User.objects.create_user(
+                    username=email,
+                    email=email,
+                    password=temp_password,
+                    first_name=data.get('first_name', '').strip(),
+                    last_name=data.get('last_name', '').strip(),
+                    phone=phone,
+                    country=data.get('country', 'BJ'),
+                    role=data['role'],
+                    active_roles=[data['role']],
+                    institution=institution,
+                    is_verified=True,
+                )
 
                 if institution and (not institution.user or institution.user_id is None):
                     institution.user = user

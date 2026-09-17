@@ -4103,8 +4103,61 @@ class AdminBouquetOfferingsView(APIView):
 
 
 class AdminBouquetOfferingDetailView(APIView):
-    """PATCH/DELETE /api/v1/admin/bouquet-offerings/<id>/ - Modification et désactivation."""
+    """GET/PATCH/DELETE /api/v1/admin/bouquet-offerings/<id>/ - Inspection complète, modification et désactivation."""
     permission_classes = [permissions.IsAuthenticated, IsAdminOrSuperAdmin]
+
+    def get(self, request, pk):
+        from apps.partners.models import BouquetOffering
+        try:
+            offering = BouquetOffering.objects.select_related('target_institution').get(id=pk)
+        except BouquetOffering.DoesNotExist:
+            return Response({"success": False, "error": "Bouquet introuvable."}, status=404)
+
+        books_qs = offering.get_books_queryset().select_related('discipline').prefetch_related('authors').order_by('title')
+        books_list = []
+        for book in books_qs:
+            cover_url = ""
+            if book.cover_image:
+                try:
+                    cover_url = book.cover_image.url
+                except Exception:
+                    cover_url = str(book.cover_image)
+            elif hasattr(book, 'cover_url') and book.cover_url:
+                cover_url = book.cover_url
+
+            authors = [
+                a.user.get_full_name() if (a.user and a.user.get_full_name()) else f"{a.first_name} {a.last_name}".strip()
+                for a in book.authors.all()
+            ] if hasattr(book, 'authors') else []
+            if not authors and getattr(book, 'auteur', None):
+                authors = [book.auteur]
+
+            books_list.append({
+                "id": str(book.id),
+                "title": book.title,
+                "authors": authors,
+                "isbn": book.isbn or "",
+                "cover_url": cover_url,
+                "discipline": book.discipline.name if book.discipline else "",
+                "format_type": getattr(book, 'format_type', 'pdf'),
+                "price_digital": float(book.price_digital or 0),
+                "publication_year": getattr(book, 'publication_year', None),
+            })
+
+        return Response({
+            "success": True,
+            "data": {
+                "id": str(offering.id),
+                "title": offering.title,
+                "bouquet_type": offering.bouquet_type,
+                "discipline": offering.discipline,
+                "country": offering.country,
+                "target_institution": str(offering.target_institution_id) if offering.target_institution_id else None,
+                "target_institution_name": offering.target_institution.name if offering.target_institution else None,
+                "books_count": len(books_list),
+                "books": books_list,
+            }
+        })
 
     def patch(self, request, pk):
         from apps.partners.models import BouquetOffering
@@ -4322,7 +4375,7 @@ def compute_bouquet_distribution_payload(offering_or_sub, requesting_institution
 
     inst_data = {}
     if hasattr(books_qs, "values"):
-        for row in books_qs.filter(institution__isnull=False).values("institution_id", "institution__name", "institution__code").annotate(c=Count("id")):
+        for row in books_qs.filter(institution__isnull=False).order_by().values("institution_id", "institution__name", "institution__code").annotate(c=Count("id")):
             iid = row["institution_id"]
             key = str(iid)
             inst_data[key] = {

@@ -107,7 +107,7 @@ export function DashboardSidebar() {
               { label: "Espace Client", href: "/student", icon: <LayoutDashboard className="size-4" /> },
               { label: "Catalogue & Recherche", href: "/student/catalog", icon: <Search className="size-4" /> },
               { label: "Ma Bibliothèque", href: "/student/books", icon: <BookOpen className="size-4" /> },
-              // { label: "Bouquets Documentaires", href: "/student/bouquets", icon: <Layers className="size-4" /> },
+              { label: "Bouquets Documentaires", href: "/student/bouquets", icon: <Layers className="size-4" /> },
               { label: "Achats & Commandes", href: "/student/orders", icon: <PackageCheck className="size-4" /> },
               // { label: "Historique & Stats", href: "/student/history", icon: <History className="size-4" /> },
               // Désactivé conformément au CDC v3.2 (le Client souscrit directement aux
@@ -150,7 +150,12 @@ export function DashboardSidebar() {
           (user as any)?.institution ||
           null;
         const instCode = (instDetail?.code || (user as any)?.institution_code || "").toUpperCase();
-        const isHistoricalPartner = ["UAC", "UP", "UNSTIM", "UNA"].includes(instCode);
+        const instName = ((instDetail?.name || (user as any)?.institution_name || "") as string).toUpperCase();
+        const isHistoricalPartner =
+          ["UAC", "UP", "UNSTIM", "UNA"].includes(instCode) ||
+          instName.includes("ABOMEY") ||
+          instName.includes("UAC") ||
+          (user?.email || "").toLowerCase().includes("universite@lahatheque.com");
         const resolvedType =
           instDetail?.institution_type ||
           (user as any)?.institution_type ||

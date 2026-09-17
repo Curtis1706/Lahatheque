@@ -12,7 +12,7 @@ import { AuthorDiscountsModal } from "@/components/features/admin/author-discoun
 import { getAdminUsers, toggleAdminUserStatus, deleteAdminUser, updatePartnerRoyaltyRate } from "@/lib/services/admin";
 import { AdminUser, AdminRole, formatRoleLabel, formatCountryName } from "@/lib/types/admin";
 import { EditUniversityUserModal } from "@/components/features/admin/edit-university-user-modal";
-import { Users, UserPlus, Eye, XCircle, CheckCircle, ArrowLeft, Mail, FileText, CheckCheck, Clock, Trash2, Sliders, Sparkles, Building2, Pencil, Percent, Save } from "lucide-react";
+import { Users, UserPlus, Eye, XCircle, CheckCircle, ArrowLeft, Mail, FileText, CheckCheck, Clock, Trash2, Sliders, Sparkles, Building2, Pencil, Percent, Save, RefreshCw } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 
@@ -724,13 +724,24 @@ export default function AdminRoleUsersPage() {
             </p>
           </div>
 
-          <button
-            onClick={() => setIsCreateModalOpen(true)}
-            className="px-4 py-2.5 rounded-xl bg-navy text-white text-xs font-semibold hover:bg-navy-hover transition-colors flex items-center gap-2 shadow-sm shrink-0"
-          >
-            <UserPlus className="w-4 h-4" />
-            Ajouter un compte
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => loadRoleUsers()}
+              disabled={loading}
+              title="Actualiser les données"
+              className="p-2.5 rounded-xl border border-border bg-background text-foreground hover:bg-background-secondary transition-colors flex items-center justify-center shrink-0 disabled:opacity-50 cursor-pointer"
+            >
+              <RefreshCw className={`w-4 h-4 text-navy ${loading ? "animate-spin" : ""}`} />
+            </button>
+
+            <button
+              onClick={() => setIsCreateModalOpen(true)}
+              className="px-4 py-2.5 rounded-xl bg-navy text-white text-xs font-semibold hover:bg-navy-hover transition-colors flex items-center gap-2 shadow-sm shrink-0 cursor-pointer"
+            >
+              <UserPlus className="w-4 h-4" />
+              Ajouter un compte
+            </button>
+          </div>
         </div>
       </div>
 

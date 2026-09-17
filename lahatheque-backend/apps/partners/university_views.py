@@ -22,6 +22,8 @@ from apps.catalog.models import Ouvrage
 
 def get_user_institution(user):
     """Récupère l'établissement rattaché à l'utilisateur connecté."""
+    if getattr(user, 'institution', None):
+        return user.institution
     if hasattr(user, 'university_profile') and user.university_profile:
         return user.university_profile
     inst = Institution.objects.filter(user=user).first()
@@ -481,7 +483,7 @@ class UniversityBouquetsView(APIView):
                         cover_url = bk.cover_image.url
                     except Exception:
                         cover_url = None
-                authors_list = [a.name for a in bk.authors.all()]
+                authors_list = [f"{a.first_name} {a.last_name}".strip() for a in bk.authors.all() if f"{a.first_name} {a.last_name}".strip()]
                 author_display = ", ".join(authors_list) if authors_list else "Auteur académique"
                 books_data.append({
                     "id": str(bk.id),
@@ -1156,72 +1158,58 @@ class UniversityRoyaltiesView(APIView):
         audio_gross_total = sum(s["gross_amount"] for s in unit_sales if s["format"] == "audio")
         audio_royalties_total = sum(s["royalty_amount"] for s in unit_sales if s["format"] == "audio")
 
-        # Extraction des bouquets réels associés à l'institution (Section 11 CDC - Zéro mock, zéro faculté)
+        # Extraction des bouquets réels associés à l'institution partenaire (CDC Section 11 & 12 - Zéro mock)
         from .models import BouquetOffering, UniversityBouquetSubscription
-        from apps.reader.models import ReaderSession
-        from apps.protection.models import TraceAcces
+        from apps.reporting.admin_views import compute_bouquet_distribution_payload
 
         bouquet_royalties = []
         bouquet_consultations_count = 0
         bouquet_gross_allocated = 0.0
         bouquet_royalties_total = 0.0
 
-        subscriptions = UniversityBouquetSubscription.objects.filter(
-            institution=inst,
-            status='active'
-        ).select_related('institution')
+        # Identifier les bouquets actifs qui intègrent des ouvrages de cette université partenaire
+        active_offerings = BouquetOffering.objects.filter(is_active=True)
+        relevant_offerings = []
+        for off in active_offerings:
+            books_qs = off.get_books_queryset(requesting_institution=inst)
+            if books_qs.filter(institution=inst).exists():
+                relevant_offerings.append((off, books_qs))
 
-        for sub in subscriptions:
-            offering = BouquetOffering.objects.filter(id=sub.offering_id).first() if sub.offering_id else None
-            books_qs = offering.get_books_queryset(requesting_institution=inst) if offering else inst.ouvrages.filter(status='published')
-            total_books_in_bouquet = books_qs.count()
-            inst_books_in_bouquet = books_qs.filter(institution=inst)
-            books_inc_cnt = inst_books_in_bouquet.count()
+        for offering, books_qs in relevant_offerings:
+            payload = compute_bouquet_distribution_payload(offering, requesting_institution_id=str(inst.id))
+            inst_item = None
+            if payload and "distribution" in payload:
+                for item in payload["distribution"]:
+                    if str(item.get("institution_id")) == str(inst.id):
+                        inst_item = item
+                        break
 
-            # Consultations réelles consolidées (ReaderSession + TraceAcces)
-            total_sessions = ReaderSession.objects.filter(
-                source_type='catalog_book',
-                ouvrage__in=books_qs
-            ).count() + TraceAcces.objects.filter(ouvrage__in=books_qs).count()
+            inst_books_cnt = inst_item["books_owned_count"] if inst_item else books_qs.filter(institution=inst).count()
+            total_bouquet_consultations = payload.get("total_consultations", 0) if payload else 0
+            univ_consultations = inst_item.get("reads_count", 0) if inst_item else 0
+            share_pct = inst_item.get("usage_percentage", 0.0) if inst_item else 0.0
+            allocated_rev = inst_item.get("ca_share", 0.0) if inst_item else 0.0
+            royalty_amt = inst_item.get("royalty_amount", 0.0) if inst_item else 0.0
+            applied_rate = inst_item.get("royalty_rate", rate) if inst_item else rate
 
-            univ_sessions = ReaderSession.objects.filter(
-                source_type='catalog_book',
-                ouvrage__in=inst_books_in_bouquet
-            ).count() + TraceAcces.objects.filter(ouvrage__in=inst_books_in_bouquet).count()
-
-            if total_sessions > 0:
-                share_pct = (univ_sessions / total_sessions * 100.0)
-            elif total_books_in_bouquet > 0:
-                share_pct = (books_inc_cnt / total_books_in_bouquet * 100.0)
-            else:
-                share_pct = 0.0
-
-            annual_price = float(sub.annual_price or 0)
-            allocated_revenue = annual_price * (share_pct / 100.0)
-            b_royalty = allocated_revenue * (rate / 100.0)
-
-            bouquet_consultations_count += univ_sessions
-            bouquet_gross_allocated += allocated_revenue
-            bouquet_royalties_total += b_royalty
-
-            start_str = sub.start_date.strftime('%d/%m/%Y') if sub.start_date else ""
-            end_str = sub.end_date.strftime('%d/%m/%Y') if sub.end_date else ""
-            period_str = f"{start_str} - {end_str}".strip(" -") or "Annuel"
+            bouquet_consultations_count += univ_consultations
+            bouquet_gross_allocated += allocated_rev
+            bouquet_royalties_total += royalty_amt
 
             bouquet_royalties.append({
-                "id": str(sub.id),
-                "bouquet_id": str(sub.offering_id) if sub.offering_id else str(sub.id),
-                "bouquet_title": sub.title,
-                "period": period_str,
-                "books_included_count": books_inc_cnt,
-                "total_bouquet_consultations": total_sessions,
-                "university_consultations": univ_sessions,
+                "id": str(offering.id),
+                "bouquet_id": str(offering.id),
+                "bouquet_title": offering.title,
+                "period": "En cours (Annuel)",
+                "books_included_count": inst_books_cnt,
+                "total_bouquet_consultations": total_bouquet_consultations,
+                "university_consultations": univ_consultations,
                 "consultation_share_percent": round(share_pct, 2),
-                "bouquet_revenue_allocated": round(allocated_revenue, 2),
-                "royalty_rate": rate,
-                "applied_rate": rate,
-                "net_royalty_amount": round(b_royalty, 2),
-                "currency": sub.currency or "XOF",
+                "bouquet_revenue_allocated": round(allocated_rev, 2),
+                "royalty_rate": applied_rate,
+                "applied_rate": applied_rate,
+                "net_royalty_amount": round(royalty_amt, 2),
+                "currency": offering.currency or "XOF",
             })
 
         total_earned = paper_royalties_total + digital_royalties_total + audio_royalties_total + bouquet_royalties_total

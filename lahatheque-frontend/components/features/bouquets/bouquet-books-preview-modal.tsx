@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import {
   getInstitutionBooksPreview,
+  getBouquetOfferingBooksPreview,
   InstitutionBooksPreviewResponse,
   InstitutionBookPreviewItem,
 } from "@/lib/services/admin";
@@ -21,55 +22,126 @@ import {
 export interface BouquetBooksPreviewModalProps {
   isOpen: boolean;
   onClose: () => void;
-  institutionId: string | null;
+  // Option 1 : ID du bouquet offering
+  bouquetId?: string | null;
+  bouquetTitle?: string;
+  // Option 2 : ID d'université
+  institutionId?: string | null;
   institutionName?: string;
+  // Option 3 : Liste directe d'ouvrages (ex: sélection sur-mesure dans la modale)
+  directBooks?: InstitutionBookPreviewItem[] | null;
+  directTitle?: string;
 }
 
 export function BouquetBooksPreviewModal({
   isOpen,
   onClose,
+  bouquetId,
+  bouquetTitle,
   institutionId,
   institutionName,
+  directBooks,
+  directTitle,
 }: BouquetBooksPreviewModalProps) {
-  const [data, setData] = useState<InstitutionBooksPreviewResponse | null>(null);
+  const [data, setData] = useState<{
+    title: string;
+    subtitle?: string;
+    books_count: number;
+    books: InstitutionBookPreviewItem[];
+  } | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
-    if (!isOpen || !institutionId) {
+    if (!isOpen) {
       setData(null);
       setError(null);
       setSearchQuery("");
       return;
     }
 
-    let isMounted = true;
-    setLoading(true);
-    setError(null);
-
-    getInstitutionBooksPreview(institutionId)
-      .then((res) => {
-        if (!isMounted) return;
-        if (res) {
-          setData(res);
-        } else {
-          setError("Impossible de charger les ouvrages de cet établissement.");
-        }
-      })
-      .catch((err) => {
-        if (!isMounted) return;
-        console.error("Erreur aperçu livres université:", err);
-        setError("Une erreur réseau est survenue.");
-      })
-      .finally(() => {
-        if (isMounted) setLoading(false);
+    // Cas 1 : Ouvrages passés directement (ex: sélection sur mesure en cours)
+    if (directBooks) {
+      setData({
+        title: directTitle || "Ouvrages sélectionnés",
+        subtitle: "Sélection sur-mesure",
+        books_count: directBooks.length,
+        books: directBooks,
       });
+      setLoading(false);
+      setError(null);
+      return;
+    }
 
-    return () => {
-      isMounted = false;
-    };
-  }, [isOpen, institutionId]);
+    // Cas 2 : ID de bouquet
+    if (bouquetId) {
+      let isMounted = true;
+      setLoading(true);
+      setError(null);
+
+      getBouquetOfferingBooksPreview(bouquetId)
+        .then((res) => {
+          if (!isMounted) return;
+          if (res) {
+            setData({
+              title: bouquetTitle || res.title,
+              subtitle: res.target_institution_name || (res.discipline ? `Discipline : ${res.discipline}` : (res.country ? `Pays : ${res.country}` : "Catalogue")),
+              books_count: res.books_count,
+              books: res.books,
+            });
+          } else {
+            setError("Impossible de charger le contenu réel de ce bouquet.");
+          }
+        })
+        .catch((err) => {
+          if (!isMounted) return;
+          console.error("Erreur aperçu livres bouquet:", err);
+          setError("Une erreur réseau est survenue.");
+        })
+        .finally(() => {
+          if (isMounted) setLoading(false);
+        });
+
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    // Cas 3 : ID d'institution
+    if (institutionId) {
+      let isMounted = true;
+      setLoading(true);
+      setError(null);
+
+      getInstitutionBooksPreview(institutionId)
+        .then((res) => {
+          if (!isMounted) return;
+          if (res) {
+            setData({
+              title: institutionName || res.institution_name,
+              subtitle: `Code : ${res.institution_code || "—"}`,
+              books_count: res.books_count,
+              books: res.books,
+            });
+          } else {
+            setError("Impossible de charger les ouvrages de cet établissement.");
+          }
+        })
+        .catch((err) => {
+          if (!isMounted) return;
+          console.error("Erreur aperçu livres université:", err);
+          setError("Une erreur réseau est survenue.");
+        })
+        .finally(() => {
+          if (isMounted) setLoading(false);
+        });
+
+      return () => {
+        isMounted = false;
+      };
+    }
+  }, [isOpen, bouquetId, bouquetTitle, institutionId, institutionName, directBooks, directTitle]);
 
   const filteredBooks = useMemo(() => {
     if (!data?.books) return [];
@@ -97,20 +169,24 @@ export function BouquetBooksPreviewModal({
         <div className="flex items-start justify-between p-4 sm:p-6 border-b border-border bg-background-secondary/50">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-gold/10 border border-gold/30 flex items-center justify-center text-gold shrink-0">
-              <Building2 className="w-5 h-5" />
+              <BookOpen className="w-5 h-5" />
             </div>
             <div>
               <h2
                 id="bouquet-books-preview-title"
                 className="font-playfair font-bold text-lg sm:text-xl text-navy"
               >
-                Ouvrages affiliés — {institutionName || data?.institution_name || "Établissement"}
+                {data?.title || bouquetTitle || institutionName || "Contenu du Bouquet"}
               </h2>
               <p className="text-xs sm:text-sm text-foreground/70 flex items-center gap-2 mt-0.5">
-                <span>Code : <strong className="text-navy">{data?.institution_code || "—"}</strong></span>
-                <span>•</span>
+                {data?.subtitle && (
+                  <>
+                    <span><strong className="text-navy">{data.subtitle}</strong></span>
+                    <span>•</span>
+                  </>
+                )}
                 <span>
-                  Total : <strong className="text-gold">{data?.books_count ?? 0} ouvrage(s)</strong> publiés
+                  Total : <strong className="text-gold">{data?.books_count ?? 0} ouvrage(s)</strong>
                 </span>
               </p>
             </div>
@@ -241,12 +317,12 @@ export function BouquetBooksPreviewModal({
         {/* Pied de page */}
         <div className="p-4 border-t border-border bg-background-secondary/30 flex items-center justify-between">
           <p className="text-xs text-foreground/60">
-            Intégralité des ouvrages automatiquement inclus dans le bouquet « Intégral Université »
+            Intégralité des ouvrages automatiquement inclus et accessibles aux abonnés de ce bouquet
           </p>
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 rounded-xl bg-navy text-background text-xs sm:text-sm font-medium hover:bg-navy-hover transition-colors shadow-sm"
+            className="px-4 py-2 rounded-xl bg-navy text-background text-xs sm:text-sm font-medium hover:bg-navy-hover transition-colors shadow-sm cursor-pointer"
           >
             Fermer
           </button>

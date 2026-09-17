@@ -179,6 +179,9 @@ export function CreateAccountModal({
   };
 
   const handleResetAndClose = () => {
+    if (step === 3) {
+      onSuccess?.();
+    }
     setStep(1);
     setFormData({ firstName: "", lastName: "", email: "", phone: "", country: "BJ", institutionName: "" });
     setSelectedInstitutionId("");
@@ -309,7 +312,7 @@ export function CreateAccountModal({
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="text-xs font-medium text-foreground">Téléphone</label>
                 <div className="mt-1">
@@ -326,7 +329,7 @@ export function CreateAccountModal({
                 <select
                   value={formData.country}
                   onChange={(e) => setFormData({ ...formData, country: e.target.value })}
-                  className="w-full mt-1 p-2.5 text-xs rounded-xl bg-background border border-border focus:border-gold focus:outline-none"
+                  className="w-full mt-1 p-2.5 text-xs rounded-xl bg-background border border-border focus:border-gold focus:outline-none min-h-[44px]"
                 >
                   <option value="BJ">Bénin (BJ)</option>
                   <option value="CI">Côte d'Ivoire (CI)</option>

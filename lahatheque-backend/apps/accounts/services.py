@@ -179,8 +179,29 @@ def _build_user_payload(user: Any) -> dict:
                 else:
                     avatar_url = f"/media/{avatar_str.lstrip('/')}"
 
-    institution_name = user.institution.name if getattr(user, 'institution', None) else None
-    institution_id = str(user.institution_id) if getattr(user, 'institution_id', None) else None
+    inst = getattr(user, 'institution', None)
+    if not inst and hasattr(user, 'university_profile'):
+        inst = getattr(user, 'university_profile', None)
+    if not inst:
+        try:
+            from apps.partners.models import Institution
+            inst = Institution.objects.filter(user=user).first()
+        except Exception:
+            inst = None
+
+    institution_name = inst.name if inst else None
+    institution_id = str(inst.id) if inst else None
+    institution_code = inst.code if inst else ""
+    institution_type = getattr(inst, 'institution_type', 'client') if inst else ""
+    institution_detail = {
+        'id': str(inst.id),
+        'name': inst.name,
+        'code': inst.code,
+        'short_name': getattr(inst, 'short_name', '') or inst.code,
+        'institution_type': getattr(inst, 'institution_type', 'client'),
+        'royalty_rate': float(inst.royalty_rate or 15.0),
+        'country': getattr(inst, 'country', 'BJ'),
+    } if inst else None
 
     date_joined_str = ""
     if hasattr(user, 'date_joined') and user.date_joined:
@@ -215,6 +236,10 @@ def _build_user_payload(user: Any) -> dict:
         'momo_number':                getattr(user, 'momo_number', '') or '',
         'institution_id':             institution_id,
         'institution_name':           institution_name,
+        'institution_code':           institution_code,
+        'institution_type':           institution_type,
+        'institution_detail':         institution_detail,
+        'university_profile':         institution_detail,
         'unread_notifications_count': unread_notifications_count,
         'date_joined':                date_joined_str,
     }
