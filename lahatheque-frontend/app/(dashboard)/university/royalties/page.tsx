@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   DollarSign,
@@ -43,6 +44,7 @@ type TabType = "unit_sales" | "bouquets";
 
 export default function UniversityRoyaltiesPage() {
   const { user } = useAuth();
+  const router = useRouter();
   const [data, setData] = useState<UniversityRoyaltiesDetailData | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabType>("unit_sales");
@@ -51,6 +53,17 @@ export default function UniversityRoyaltiesPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [formatFilter, setFormatFilter] = useState<"all" | "paper" | "digital" | "audio">("all");
   const [buyerFilter, setBuyerFilter] = useState<string>("all");
+
+  // T012 : Redirection de sécurité — les universités clientes n'ont pas accès aux redevances
+  useEffect(() => {
+    const instType =
+      (user as any)?.institution_detail?.institution_type ||
+      (user as any)?.university_profile?.institution_type;
+    if (instType === "client") {
+      console.info("[UNIV ACCESS GUARD]", new Date().toISOString(), "- Client redirected from /royalties to /university");
+      router.replace("/university");
+    }
+  }, [user, router]);
 
   useEffect(() => {
     async function loadData() {

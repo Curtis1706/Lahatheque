@@ -56,6 +56,7 @@ class UserSerializer(serializers.ModelSerializer):
                 "name": inst.name,
                 "code": inst.code,
                 "short_name": getattr(inst, 'short_name', '') or inst.code,
+                "institution_type": getattr(inst, 'institution_type', 'client'),
                 "royalty_rate": float(inst.royalty_rate or 15.0),
                 "country": inst.country,
             }

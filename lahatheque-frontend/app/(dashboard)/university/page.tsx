@@ -9,14 +9,11 @@ import {
   DollarSign,
   TrendingUp,
   ArrowRight,
-  PlusCircle,
-  Download,
-  Building2,
-  FileSpreadsheet,
-  Users,
-  ShieldCheck,
   ShoppingBag,
   Sparkles,
+  Building2,
+  PackageCheck,
+  ShieldCheck,
 } from "lucide-react";
 import { DonutChart, type DonutChartSegment } from "@/components/ui/donut-chart";
 import { ProgressMetricCard } from "@/components/ui/progress-metric-card";
@@ -34,7 +31,7 @@ import type {
   UniversityFacultyData,
 } from "@/lib/types/university";
 
-// Générateur de timeline pour activer les barres bâtonnets sparklines de ProgressMetricCard (identique à l'admin)
+// Générateur de timeline pour activer les barres bâtonnets sparklines de ProgressMetricCard
 const getRollingTimeline = (count: number) => {
   const monthNames = ["Janv", "Févr", "Mars", "Avr", "Mai", "Juin", "Juil", "Août", "Sept", "Oct", "Nov", "Déc"];
   const now = new Date();
@@ -67,6 +64,7 @@ export default function UniversityOverviewPage() {
       setBouquets(bqData);
       setFaculties(facData);
       setLoading(false);
+      console.info("[UNIV KPIS]", new Date().toISOString(), "- Établissement chargé :", kpiData?.institution_code, "Type :", kpiData?.institution_type);
     }
     loadData();
   }, []);
@@ -99,6 +97,168 @@ export default function UniversityOverviewPage() {
     );
   }
 
+  // ── Détermine le type depuis les KPIs (source de vérité backend) ──
+  const institutionType = kpis.institution_type ?? "partner"; // conservateur : partenaire si inconnu
+  const isClient = institutionType === "client";
+  const isPartner = institutionType === "partner";
+
+  // ── Université Cliente : expérience campus épurée ──
+  if (isClient) {
+    const accessibleBooks = (kpis as any).accessible_books_count ?? 0;
+    const paperOrders = (kpis as any).paper_orders_count ?? 0;
+
+    return (
+      <div className="p-4 sm:p-6 md:p-8 w-full space-y-8 max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border pb-6">
+          <div>
+            <div className="flex items-center gap-2 text-xs font-bold text-navy uppercase tracking-wider mb-1">
+              <Building2 className="w-4 h-4 text-gold" />
+              Espace Université Cliente
+            </div>
+            <h1 className="font-serif text-2xl sm:text-3xl font-bold text-navy">
+              {kpis.institution_name
+                ? `${kpis.institution_name} (${kpis.institution_code || ""})`
+                : "Votre Université"}
+            </h1>
+            <p className="text-xs text-foreground-muted mt-1">
+              Accès au catalogue numérique, suivi de vos abonnements campus et commandes d&apos;ouvrages papier.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Link
+              href="/university/purchases/new"
+              className="px-4 py-2.5 rounded-xl bg-background border border-border hover:border-gold text-navy text-xs font-bold transition-colors inline-flex items-center gap-2 shadow-xs min-h-[44px]"
+            >
+              <ShoppingBag className="w-4 h-4 text-gold" />
+              Passer Commande
+            </Link>
+            <Link
+              href="/university/bouquets"
+              className="px-4 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors inline-flex items-center gap-2 shadow-xs min-h-[44px]"
+            >
+              <Layers className="w-4 h-4 text-gold" />
+              Souscrire un Bouquet
+            </Link>
+          </div>
+        </div>
+
+        {/* 4 KPI Cards Campus */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <ProgressMetricCard
+            title="Bouquets Souscrits"
+            total={`${kpis.active_bouquets_count} Packs`}
+            percent={kpis.active_bouquets_count > 0 ? `+${kpis.active_bouquets_count}` : "0"}
+            trend={kpis.active_bouquets_count > 0 ? "up" : "down"}
+            accent="gold"
+            delta="Campus"
+            deltaLabel="souscrits"
+            defaultView="bar"
+            data={getRollingTimeline(kpis.active_bouquets_count)}
+          />
+          <ProgressMetricCard
+            title="Ouvrages Accessibles"
+            total={`${accessibleBooks} Titres`}
+            percent="Numérique"
+            trend="up"
+            accent="navy"
+            delta="Abonnements campus"
+            deltaLabel="actifs"
+            defaultView="bar"
+            data={getRollingTimeline(accessibleBooks)}
+          />
+          <ProgressMetricCard
+            title="Lectures Campus"
+            total={`${kpis.monthly_consultations_count}`}
+            percent={`${kpis.consultations_trend_percent > 0 ? "+" : ""}${kpis.consultations_trend_percent}%`}
+            trend={kpis.consultations_trend_percent >= 0 ? "up" : "down"}
+            accent="emerald"
+            delta="Ce mois"
+            deltaLabel="sessions actives"
+            defaultView="bar"
+            data={getRollingTimeline(kpis.monthly_consultations_count)}
+          />
+          <ProgressMetricCard
+            title="Commandes Papier"
+            total={`${paperOrders}`}
+            percent="Institutionnelles"
+            trend="up"
+            accent="gold"
+            delta="Commandes"
+            deltaLabel="passées"
+            defaultView="bar"
+            data={getRollingTimeline(paperOrders)}
+          />
+        </div>
+
+        {/* Offres de bouquets disponibles à souscrire */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="flex items-center gap-2 text-xs font-bold text-navy uppercase tracking-wider mb-0.5">
+                <Layers className="w-4 h-4 text-gold" />
+                Ressources Documentaires Campus
+              </div>
+              <h2 className="font-serif text-xl font-bold text-navy">
+                Bouquets Documentaires Disponibles
+              </h2>
+            </div>
+            <Link
+              href="/university/bouquets"
+              className="text-xs font-bold text-navy hover:text-gold inline-flex items-center gap-1 transition-colors"
+            >
+              <span>Voir tous les bouquets</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {bouquets
+              .filter((b) => (b.bouquet_type as string) !== "general" && !b.title.toLowerCase().includes("général") && !b.title.toLowerCase().includes("general"))
+              .slice(0, 2)
+              .map((bq) => (
+                <BouquetCard key={bq.id} bouquet={bq} onSubscribe={handleSubscribe} />
+              ))}
+          </div>
+        </div>
+
+        {/* Raccourcis Rapides */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+          <Link
+            href="/university/catalog"
+            className="p-5 rounded-2xl bg-background border border-border hover:border-gold transition-all shadow-xs flex items-center justify-between group"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-navy-light flex items-center justify-center group-hover:bg-gold/15 transition-colors">
+                <BookOpen className="w-5 h-5 text-gold" />
+              </div>
+              <div>
+                <p className="font-serif font-bold text-sm text-navy">Catalogue Numérique</p>
+                <p className="text-[11px] text-foreground-muted">Ouvrages accessibles via vos abonnements</p>
+              </div>
+            </div>
+            <ArrowRight className="w-4 h-4 text-foreground-muted group-hover:text-gold transition-colors" />
+          </Link>
+          <Link
+            href="/university/purchases"
+            className="p-5 rounded-2xl bg-background border border-border hover:border-gold transition-all shadow-xs flex items-center justify-between group"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-navy-light flex items-center justify-center group-hover:bg-gold/15 transition-colors">
+                <PackageCheck className="w-5 h-5 text-gold" />
+              </div>
+              <div>
+                <p className="font-serif font-bold text-sm text-navy">Commandes Institutionnelles</p>
+                <p className="text-[11px] text-foreground-muted">Livres papier pour votre campus</p>
+              </div>
+            </div>
+            <ArrowRight className="w-4 h-4 text-foreground-muted group-hover:text-gold transition-colors" />
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Université Partenaire : expérience redevances complète ──
   const donutSegments: DonutChartSegment[] = kpis?.revenue_split
     ? [
         {
@@ -118,11 +278,11 @@ export default function UniversityOverviewPage() {
 
   return (
     <div className="p-4 sm:p-6 md:p-8 w-full space-y-8 max-w-7xl mx-auto">
-      {/* Header avec nom d'université dynamique */}
+      {/* Header Partenaire */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border pb-6">
         <div>
           <div className="flex items-center gap-2 text-xs font-bold text-navy uppercase tracking-wider mb-1">
-            <Building2 className="w-4 h-4 text-gold" />
+            <ShieldCheck className="w-4 h-4 text-gold" />
             Portail Université Partenaire
           </div>
           <h1 className="font-serif text-2xl sm:text-3xl font-bold text-navy">
@@ -131,10 +291,9 @@ export default function UniversityOverviewPage() {
               : "Université d'Abomey-Calavi (UAC)"}
           </h1>
           <p className="text-xs text-foreground-muted mt-1">
-            Supervision académique, gestion des bouquets documentaires et suivi des redevances conventionnées.
+            Supervision académique et suivi des redevances conventionnées avec LAHA Éditions.
           </p>
         </div>
-
         <div className="flex items-center gap-2">
           <Link
             href="/university/purchases/new"
@@ -144,51 +303,30 @@ export default function UniversityOverviewPage() {
             Passer Commande
           </Link>
           <Link
-            href="/university/bouquets"
+            href="/university/royalties"
             className="px-4 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors inline-flex items-center gap-2 shadow-xs min-h-[44px]"
           >
-            <Layers className="w-4 h-4 text-gold" />
-            Souscrire un Bouquet
+            <DollarSign className="w-4 h-4 text-gold" />
+            Mes Redevances
           </Link>
         </div>
       </div>
 
-      {/* 4 KPI Cards Principales Connectées aux Bouquets & Redevances */}
+      {/* 4 KPI Cards Partenaire */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <ProgressMetricCard
-          title="Bouquets Souscrits"
-          total={`${kpis.active_bouquets_count} Packs`}
-          percent={kpis.active_bouquets_count > 0 ? `+${kpis.active_bouquets_count}` : "0"}
-          trend={kpis.active_bouquets_count > 0 ? "up" : "down"}
-          accent="gold"
-          delta="Campus"
-          deltaLabel="souscrits"
-          defaultView="bar"
-          data={getRollingTimeline(kpis.active_bouquets_count)}
-        />
-
-        <ProgressMetricCard
-          title="Vos Ouvrages en Bouquets"
-          total={`${bouquets.reduce(
-            (acc, b) => acc + (b.my_books_count ?? 0),
-            0
-          )} Ouvrages`}
+          title="Ouvrages Catalogue"
+          total={`${bouquets.reduce((acc, b) => acc + (b.my_books_count ?? 0), 0)} Ouvrages`}
           percent="Inclus"
           trend="up"
           accent="navy"
           delta="Catalogue partagé"
           deltaLabel="multi-établissements"
           defaultView="bar"
-          data={getRollingTimeline(
-            bouquets.reduce(
-              (acc, b) => acc + (b.my_books_count ?? 0),
-              0
-            )
-          )}
+          data={getRollingTimeline(bouquets.reduce((acc, b) => acc + (b.my_books_count ?? 0), 0))}
         />
-
         <ProgressMetricCard
-          title="Part d'Audience Moyenne"
+          title="Part d'Audience"
           total={`${kpis.audience_share_percent != null ? kpis.audience_share_percent : 0} %`}
           percent="Usage réel"
           trend="up"
@@ -198,7 +336,17 @@ export default function UniversityOverviewPage() {
           defaultView="bar"
           data={getRollingTimeline(kpis.audience_share_percent ? Math.round(kpis.audience_share_percent) : 0)}
         />
-
+        <ProgressMetricCard
+          title="Lectures Enregistrées"
+          total={`${kpis.monthly_consultations_count}`}
+          percent={`${kpis.consultations_trend_percent > 0 ? "+" : ""}${kpis.consultations_trend_percent}%`}
+          trend={kpis.consultations_trend_percent >= 0 ? "up" : "down"}
+          accent="gold"
+          delta="Ce mois"
+          deltaLabel="sessions actives"
+          defaultView="bar"
+          data={getRollingTimeline(kpis.monthly_consultations_count)}
+        />
         <ProgressMetricCard
           title="Redevances Disponibles"
           total={`${kpis.total_royalties_available.toLocaleString("fr-FR")} ${kpis.currency || "XOF"}`}
@@ -212,7 +360,7 @@ export default function UniversityOverviewPage() {
         />
       </div>
 
-      {/* Répartition des Revenus (Transparence Université / LAHAThèque - Section 11 CDC) */}
+      {/* DonutChart Répartition des Revenus */}
       {kpis?.revenue_split && kpis.revenue_split.total_ca > 0 && (
         <div className="p-5 sm:p-6 rounded-2xl border border-border bg-background-secondary shadow-xs">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-border">
@@ -231,7 +379,6 @@ export default function UniversityOverviewPage() {
               </p>
             </div>
           </div>
-
           <div className="my-6 flex flex-col md:flex-row items-center justify-around gap-6">
             <DonutChart
               data={donutSegments}
@@ -246,8 +393,6 @@ export default function UniversityOverviewPage() {
                 </div>
               }
             />
-
-            {/* Légende interactive conforme à la charte */}
             <div className="w-full md:w-auto space-y-3">
               <div className="flex items-center justify-between gap-6 p-3.5 rounded-xl bg-background border border-border min-w-[280px]">
                 <div className="flex items-center gap-2.5">
@@ -266,7 +411,6 @@ export default function UniversityOverviewPage() {
                   </p>
                 </div>
               </div>
-
               <div className="flex items-center justify-between gap-6 p-3.5 rounded-xl bg-background border border-border min-w-[280px]">
                 <div className="flex items-center gap-2.5">
                   <span className="w-3.5 h-3.5 rounded-full bg-gold shrink-0" />
@@ -300,70 +444,14 @@ export default function UniversityOverviewPage() {
         </div>
       )}
 
-
-
-      {/* Bouquets Documentaires en Vedette (Offres Campus) */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-2 text-xs font-bold text-navy uppercase tracking-wider mb-0.5">
-              <Layers className="w-4 h-4 text-gold" />
-              Ressources Documentaires Campus
-            </div>
-            <h2 className="font-serif text-xl font-bold text-navy">
-              Bouquets Documentaires Disponibles
-            </h2>
-          </div>
-          <Link
-            href="/university/bouquets"
-            className="text-xs font-bold text-navy hover:text-gold inline-flex items-center gap-1 transition-colors"
-          >
-            <span>Voir tous les bouquets</span>
-            <ArrowRight className="w-3.5 h-3.5" />
-          </Link>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {bouquets
-            .filter((b) => (b.bouquet_type as string) !== "general" && !b.title.toLowerCase().includes("général") && !b.title.toLowerCase().includes("general"))
-            .slice(0, 2)
-            .map((bq) => (
-              <BouquetCard
-                key={bq.id}
-                bouquet={bq}
-                onSubscribe={handleSubscribe}
-              />
-            ))}
-        </div>
-      </div>
-
-      {/* Raccourcis Rapides */}
+      {/* Raccourcis Rapides Partenaire */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-        {/* Raccourci Affiliations Étudiants (Masqué à la demande client) */}
-        {/*
-        <Link
-          href="/university/affiliations"
-          className="p-5 rounded-2xl bg-background border border-border hover:border-gold transition-all shadow-xs flex items-center justify-between group"
-        >
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-navy-light flex items-center justify-center text-navy group-hover:bg-gold/15 group-hover:text-navy transition-colors">
-              <Users className="w-5 h-5 text-gold" />
-            </div>
-            <div>
-              <p className="font-serif font-bold text-sm text-navy">Affiliations Étudiants</p>
-              <p className="text-[11px] text-foreground-muted">Valider les matricules en attente</p>
-            </div>
-          </div>
-          <ArrowRight className="w-4 h-4 text-foreground-muted group-hover:text-gold transition-colors" />
-        </Link>
-        */}
-
         <Link
           href="/university/catalog"
           className="p-5 rounded-2xl bg-background border border-border hover:border-gold transition-all shadow-xs flex items-center justify-between group"
         >
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-navy-light flex items-center justify-center text-navy group-hover:bg-gold/15 group-hover:text-navy transition-colors">
+            <div className="w-10 h-10 rounded-xl bg-navy-light flex items-center justify-center group-hover:bg-gold/15 transition-colors">
               <BookOpen className="w-5 h-5 text-gold" />
             </div>
             <div>
@@ -373,13 +461,12 @@ export default function UniversityOverviewPage() {
           </div>
           <ArrowRight className="w-4 h-4 text-foreground-muted group-hover:text-gold transition-colors" />
         </Link>
-
         <Link
           href="/university/royalties"
           className="p-5 rounded-2xl bg-background border border-border hover:border-gold transition-all shadow-xs flex items-center justify-between group"
         >
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-navy-light flex items-center justify-center text-navy group-hover:bg-gold/15 group-hover:text-navy transition-colors">
+            <div className="w-10 h-10 rounded-xl bg-navy-light flex items-center justify-center group-hover:bg-gold/15 transition-colors">
               <DollarSign className="w-5 h-5 text-gold" />
             </div>
             <div>

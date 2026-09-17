@@ -249,3 +249,55 @@
   - Contrats d'API (Phase 1) : `specs/008-courrier-redevances-relances/contracts/api-courriers.md`
   - Modèles de courriers types : `specs/008-courrier-redevances-relances/templates-courriers.md`
   - Tâches d'implémentation (Phase 2) : `specs/008-courrier-redevances-relances/tasks.md` (34 tâches ordonnées)
+
+---
+
+## 10. Distinction Étanche Universités Partenaires vs Universités Clientes (Feature 009 - Implémentée et Validée le 2026-09-17)
+
+- **Objectif & Cadrage Métier** :
+  - Séparation étanche en deux typologies d'établissements universitaires :
+    1. **Universités Partenaires (Ayant droit)** : Les 4 universités fondatrices (UAC, UP, UNSTIM, UNA). Elles perçoivent des redevances conventionnées (taux standard 15%) sur les ventes et l'audience de leurs ouvrages. Elles ne souscrivent jamais de bouquets documentaires et ne voient aucune offre d'achat ou de souscription payante.
+    2. **Universités Clientes (Souscriptrices)** : Tous les autres établissements et instituts supérieurs privés ou publics. Elles souscrivent des bouquets documentaires pour leurs campus et achètent des livres physiques en gros. Elles ont un taux de redevance forcé à 0% et n'ont aucun accès au portail des redevances (menu absent, accès direct bloqué avec redirection et code HTTP 403 Forbidden).
+  - Désactivation des affiliations étudiantes conformément au CDC v3.2 (le client lecteur accède directement aux bouquets sans affiliation universitaire obligatoire).
+
+- **Modèle de Données & Migrations** :
+  - **Champ `institution_type`** : Ajouté sur le modèle `Institution` (`apps/partners/models.py`) avec choix `('partner', 'Université Partenaire (Ayant droit)')` et `('client', 'Université Cliente (Souscriptrice)')`, défaut `client`, indexé avec `is_active`.
+  - **Migration Django** : `0008_institution_institution_type_and_data_migration.py` appliquant une opération `RunPython` certifiant rétroactivement le statut `partner` pour UAC, UP, UNSTIM et UNA, et `client` pour tous les autres établissements.
+  - **Verrou d'Intégrité Inviolable (T018)** : Implémenté dans `Institution.clean()`, `Institution.save()` et `InstitutionViewSet` interdisant formellement par exception de validation / PermissionDenied de passer le statut d'une des 4 universités fondatrices en `client`.
+
+- **Administration & Gestion des Comptes (T017 - T021)** :
+  - **Création Administrative (`UserAdminViewSet.create`)** : Sélecteur Partenaire/Cliente, taux de redevance automatiquement forcé à 0.00% pour les clientes (15.00% pour partenaires), et contrôle d'unicité stricte du compte modérateur par institution (bloquage avec code HTTP 409 Conflict si un modérateur actif existe déjà).
+  - **Modale de Création (`CreateAccountModal`)** : Sélecteur Partenaire/Cliente pour les nouvelles institutions, masquage de la mention du taux 15% pour les clientes, gestion ergonomique du retour 409 (toast explicatif avec email du modérateur existant).
+  - **Modale d'Édition (`EditUniversityUserModal`)** : Affichage du badge `institution_type`, badge protecteur "Verrouillé" et désactivation du changement de type pour les 4 fondatrices, masquage du taux pour les clientes.
+  - **Table Administration des Universités (`/admin/users/universities`)** : Badges visuels « Partenaire » ou « Cliente », masquage du taux pour les clientes (mention "Non applicable").
+
+- **Tableaux de Bord & Expérience Utilisateur (T007 - T016)** :
+  - **Accueil Espace Université (`/university`)** :
+    - *Pour les Clientes* : 4 KPI campus (Bouquets souscrits, Ouvrages accessibles, Lectures campus, Commandes physiques), masquage complet du DonutChart de chiffre d'affaires et de toute mention de redevance, affichage des offres de bouquets à souscrire.
+    - *Pour les Partenaires* : Badge officiel « Portail Université Partenaire », 4 KPI de valorisation des droits (Ouvrages catalogue, Part d'audience réelle, Lectures enregistrées, Redevances disponibles), DonutChart de répartition du chiffre d'affaires (15% établissement / 85% LAHAThèque), aucun bouton ni offre de souscription.
+  - **Barre Latérale (`dashboard-sidebar.tsx`) & Navigation Mobile (`mobile-bottom-nav.tsx`)** :
+    - Pour les Clientes : Lien « Redevances » strictement masqué.
+    - Pour les Partenaires : Lien « Bouquets Documentaires » strictement masqué.
+  - **Catalogue d'Abonnement Dédié (`UniversityClientCatalogView`)** :
+    - Endpoint `/api/v1/partners/university/catalog/` renvoyant les ouvrages issus des bouquets actifs souscrits par l'établissement client.
+  - **Deep Links & Gardes de Sécurité Front/Back** :
+    - Accès direct à `/university/royalties` par une cliente : redirection immédiate vers `/university` côté React + HTTP 403 Forbidden sur `UniversityRoyaltiesView` et `UniversityRoyaltyWithdrawView`.
+    - Accès direct à `/university/bouquets` par un partenaire : redirection automatique vers `/university/royalties` avec toast informatif + HTTP 403 Forbidden sur `UniversityBouquetSubscribeView`.
+
+- **Reporting Financier & Reversements Globaux (T022 - T023)** :
+  - Filtrage strict `institution_type='partner'` sur `AdminRoyaltiesPayoutViewSet.list`, `partner_configs`, `update_partner_rate` et `AdminPartnerRoyaltiesView`.
+  - Blocage explicite des tentatives d'ajustement de taux sur des universités clientes.
+  - Tableau de bord `/admin/royalties/universities` garanti 100% exempt de tout établissement client.
+
+- **Télémétrie & Logs Structurés (T024)** :
+  - Préfixes normalisés avec horodatage ISO : `[UNIV KPIS]`, `[UNIV ACCESS GUARD]`, `[ADMIN INSTITUTION]` insérés dans l'ensemble des composants frontend et endpoints backend.
+
+- **Artefacts SpecKit associés** :
+  - Spécification : `specs/009-university-partner-client-split/spec.md`
+  - Checklist qualité : `specs/009-university-partner-client-split/checklists/requirements.md` (100% validée)
+  - Plan d'implémentation : `specs/009-university-partner-client-split/plan.md`
+  - Recherche technique : `specs/009-university-partner-client-split/research.md`
+  - Modèle de données : `specs/009-university-partner-client-split/data-model.md`
+  - Guide quickstart : `specs/009-university-partner-client-split/quickstart.md`
+  - Contrats JSON Schema : `specs/009-university-partner-client-split/contracts/`
+  - Tâches d'implémentation : `specs/009-university-partner-client-split/tasks.md` (25/25 complétées et cochées `[X]`)

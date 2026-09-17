@@ -1011,6 +1011,51 @@ class AdminRoyaltiesPayoutViewSet(viewsets.ViewSet):
                 "admin_notes": p.admin_notes,
             })
 
+        # T022 : Intégrer les relevés de redevances des Universités Partenaires uniquement (exclure formellement les clientes)
+        if type_filter in ['all', 'university']:
+            from apps.partners.models import UniversityRoyaltyStatement
+            stmt_qs = UniversityRoyaltyStatement.objects.filter(
+                institution__institution_type='partner'
+            ).select_related('institution', 'institution__user').order_by('-created_at')
+
+            if status_filter and status_filter != 'all':
+                stmt_status_map = {'pending': 'pending', 'processed': 'paid', 'settled': 'paid', 'paid': 'paid'}
+                target_status = stmt_status_map.get(status_filter, status_filter)
+                stmt_qs = stmt_qs.filter(status=target_status)
+
+            for stmt in stmt_qs:
+                inst = stmt.institution
+                inst_user = inst.user if inst else None
+                inst_name = inst.name if inst else "Université Partenaire"
+                inst_email = inst_user.email if inst_user else (getattr(inst, 'contact_email', '') or "rectorat@univ.bj")
+
+                results.append({
+                    "id": f"univ-stmt-{stmt.id}",
+                    "beneficiary_id": str(inst.id) if inst else "",
+                    "beneficiary_name": inst_name,
+                    "beneficiary_type": "university",
+                    "beneficiary_email": inst_email,
+                    "purpose_label": f"Relevé de redevances {stmt.reference} ({stmt.period})",
+                    "gross_base_amount": float(stmt.total_sales_catalog or 0),
+                    "effective_rate_percent": float(stmt.royalty_rate or 15.0),
+                    "university_rate_percent": float(stmt.royalty_rate or 15.0),
+                    "net_payout_amount": float(stmt.net_royalty_amount),
+                    "amount": float(stmt.net_royalty_amount),
+                    "payout_amount": float(stmt.net_royalty_amount),
+                    "total_reads": 0,
+                    "payment_method": "bank",
+                    "payment_details_preview": getattr(inst, 'bank_name', '') or "Trésorerie Universitaire",
+                    "status": "settled" if stmt.status == 'paid' else ("pending" if stmt.status == 'pending' else "available"),
+                    "transaction_reference": stmt.reference,
+                    "payout_date": str(stmt.created_at.date()) if stmt.created_at else None,
+                    "receipt_file_url": stmt.pdf_statement_url or None,
+                    "rejection_reason": None,
+                    "created_at": stmt.created_at.isoformat() if stmt.created_at else None,
+                    "book_title": f"Relevé {stmt.reference}",
+                    "account_details": getattr(inst, 'bank_name', '') or "Compte Trésorerie",
+                    "admin_notes": "",
+                })
+
         total_count = len(results)
         is_all = (
             request.GET.get('all') == 'true'
@@ -1427,8 +1472,8 @@ class AdminRoyaltiesPayoutViewSet(viewsets.ViewSet):
                         "last_updated": c.date_signature.isoformat() if c.date_signature else c.created_at.strftime("%Y-%m-%d"),
                     })
 
-            # 3. Établissements Universitaires Partenaires (Institution)
-            institutions = Institution.objects.filter(is_active=True).order_by('name')
+            # 3. Établissements Universitaires Partenaires (Institution) — T022 : partenaires uniquement
+            institutions = Institution.objects.filter(is_active=True, institution_type='partner').order_by('name')
             for inst in institutions:
                 if not any(r["partner_id"] == str(inst.id) for r in results):
                     results.append({
@@ -1478,6 +1523,11 @@ class AdminRoyaltiesPayoutViewSet(viewsets.ViewSet):
             else:
                 try:
                     inst = Institution.objects.get(id=partner_id)
+                    if inst.institution_type == 'client':
+                        return Response(
+                            {"success": False, "error": "Les universités clientes ne perçoivent pas de redevances conventionnées."},
+                            status=status.HTTP_400_BAD_REQUEST
+                        )
                     inst.royalty_rate = float(new_rate)
                     inst.save(update_fields=['royalty_rate'])
                     updated_name = inst.name
@@ -3455,9 +3505,9 @@ class AdminPartnerRoyaltiesView(APIView):
                     "books": books_list,
                 })
 
-        # 3. Universités Partenaires
+        # 3. Universités Partenaires — T022 : partenaires uniquement
         if role_filter in ['all', 'university']:
-            institutions = Institution.objects.all()
+            institutions = Institution.objects.filter(is_active=True, institution_type='partner')
             for inst in institutions:
                 stmts = UniversityRoyaltyStatement.objects.filter(institution=inst)
                 total_rev = float(stmts.aggregate(s=Sum('total_sales_catalog'))['s'] or 0.0)

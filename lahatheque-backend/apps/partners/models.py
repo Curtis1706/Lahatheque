@@ -34,6 +34,19 @@ class Institution(models.Model):
     bank_swift = models.CharField(max_length=32, blank=True, default="", verbose_name="Code BIC / SWIFT")
     momo_number = models.CharField(max_length=32, blank=True, default="", verbose_name="Compte Mobile Money Institutionnel")
     
+    # Typologie Institutionnelle Étanche (Partenaire Ayant droit vs Cliente Souscriptrice)
+    INSTITUTION_TYPE_CHOICES = (
+        ('partner', 'Université Partenaire (Ayant droit)'),
+        ('client', 'Université Cliente (Souscriptrice)'),
+    )
+    institution_type = models.CharField(
+        max_length=20,
+        choices=INSTITUTION_TYPE_CHOICES,
+        default='client',
+        db_index=True,
+        verbose_name="Typologie de l'établissement"
+    )
+
     # Contrat & Mandat
     contract_reference = models.CharField(max_length=64, default="CTR-UNIV-2025-01", verbose_name="Réf. Convention Cadre")
     royalty_rate = models.DecimalField(max_digits=5, decimal_places=2, default=15.00, null=True, blank=True, verbose_name="Taux de Redevance (%)")
@@ -43,11 +56,33 @@ class Institution(models.Model):
 
     class Meta:
         ordering = ["name"]
+        indexes = [
+            models.Index(fields=["institution_type", "is_active"]),
+        ]
 
     def __str__(self) -> str:
         return f"{self.name} ({self.code or self.short_name})"
 
+    # T018 : Codes des 4 universités partenaires historiques — leur statut 'partner' est inviolable.
+    LOCKED_PARTNER_CODES = frozenset({'UAC', 'UP', 'UNSTIM', 'UNA'})
+
+    def clean(self) -> None:
+        """T018 : Interdit formellement de reclasser une des 4 institutions historiques en 'client'."""
+        if self.code and self.code.upper() in self.LOCKED_PARTNER_CODES:
+            if self.institution_type != 'partner':
+                from django.core.exceptions import ValidationError
+                raise ValidationError({
+                    'institution_type': (
+                        f"L'institution '{self.code}' fait partie des 4 universités partenaires fondatrices "
+                        "(UAC, UP, UNSTIM, UNA). Son statut 'Partenaire Ayant droit' est verrouillé et ne peut "
+                        "pas être modifié par voie administrative. Contactez l'équipe technique si une correction "
+                        "exceptionnelle est nécessaire."
+                    )
+                })
+
     def save(self, *args, **kwargs):
+        # T018 : Appliquer la validation métier avant chaque sauvegarde
+        self.full_clean(exclude=['user'])  # exclude 'user' car OneToOneField peut être null
         if not self.short_name and self.code:
             self.short_name = self.code
         elif not self.code and self.short_name:

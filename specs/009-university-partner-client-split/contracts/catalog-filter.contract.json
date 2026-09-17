@@ -1,0 +1,40 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "UniversityCatalogFilterContract",
+  "description": "Contrat pour la récupération du catalogue universitaire adapté selon le statut de l'établissement",
+  "type": "object",
+  "required": ["success", "data", "error"],
+  "properties": {
+    "success": { "type": "boolean" },
+    "error": { "type": ["string", "null"] },
+    "data": {
+      "type": "object",
+      "required": ["institution_type", "total_books", "books"],
+      "properties": {
+        "institution_type": {
+          "type": "string",
+          "enum": ["partner", "client"]
+        },
+        "total_books": { "type": "integer", "minimum": 0 },
+        "active_bouquets_count": { "type": "integer", "minimum": 0 },
+        "books": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "title", "authors"],
+            "properties": {
+              "id": { "type": "string" },
+              "title": { "type": "string" },
+              "authors": { "type": "array", "items": { "type": "string" } },
+              "faculty_name": { "type": "string" },
+              "discipline": { "type": "string" },
+              "cover_url": { "type": "string" },
+              "source_bouquet_id": { "type": ["string", "null"] },
+              "source_bouquet_title": { "type": ["string", "null"] }
+            }
+          }
+        }
+      }
+    }
+  }
+}

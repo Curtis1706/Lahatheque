@@ -43,6 +43,44 @@ class InstitutionViewSet(viewsets.ModelViewSet):
     serializer_class = InstitutionSerializer
     permission_classes = [permissions.IsAuthenticated, IsAdminOrSuperAdmin]
 
+    # T018 : Codes des 4 partenaires historiques dont institution_type est inviolable
+    LOCKED_PARTNER_CODES = frozenset({'UAC', 'UP', 'UNSTIM', 'UNA'})
+
+    def _check_integrity_lock(self, instance: 'Institution', new_institution_type: 'str | None') -> None:
+        """
+        T018 : Lève une PermissionDenied si on tente de passer institution_type
+        d'une des 4 institutions historiques vers autre chose que 'partner'.
+        """
+        from rest_framework.exceptions import PermissionDenied
+        import datetime
+        if instance.code and instance.code.upper() in self.LOCKED_PARTNER_CODES:
+            if new_institution_type is not None and new_institution_type != 'partner':
+                logger.warning(
+                    "[ADMIN INSTITUTION] %s T018 INTEGRITY LOCK — Tentative de reclassement de '%s' en '%s' bloquée par la garde backend.",
+                    datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                    instance.code,
+                    new_institution_type,
+                )
+                raise PermissionDenied(
+                    detail=(
+                        f"L'institution '{instance.code}' fait partie des 4 universités partenaires fondatrices "
+                        "(UAC, UP, UNSTIM, UNA). Son statut est verrouillé et ne peut pas être modifié "
+                        "(T018 Integrity Lock). Contactez l'équipe technique si une correction exceptionnelle est nécessaire."
+                    )
+                )
+
+    def update(self, request, *args, **kwargs):
+        """T018 : Surcharge PUT — applique le verrou d'intégrité avant toute modification."""
+        instance = self.get_object()
+        self._check_integrity_lock(instance, request.data.get('institution_type'))
+        return super().update(request, *args, **kwargs)
+
+    def partial_update(self, request, *args, **kwargs):
+        """T018 : Surcharge PATCH — applique le verrou d'intégrité avant toute modification partielle."""
+        instance = self.get_object()
+        self._check_integrity_lock(instance, request.data.get('institution_type'))
+        return super().partial_update(request, *args, **kwargs)
+
 
 class StudentAffiliationViewSet(viewsets.ModelViewSet):
     queryset = StudentAffiliation.objects.all().order_by('-created_at')

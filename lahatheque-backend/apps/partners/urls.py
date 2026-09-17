@@ -21,6 +21,7 @@ from .university_views import (
     ExportBouquetWordView,
     UniversityBouquetDistributionView,
     BouquetRelevanceReportView,
+    UniversityClientCatalogView,
 )
 from apps.reporting.admin_views import AdminBouquetOfferingsView
 
@@ -50,5 +51,6 @@ urlpatterns = [
     path('university/royalties/', UniversityRoyaltiesView.as_view(), name='university-royalties'),
     path('university/royalties/withdraw/', UniversityRoyaltyWithdrawView.as_view(), name='university-royalty-withdraw'),
     path('university/profile/', UniversityProfileView.as_view(), name='university-profile'),
+    path('university/catalog/', UniversityClientCatalogView.as_view(), name='university-client-catalog'),
     path('admin/bouquets/', AdminBouquetOfferingsView.as_view(), name='partner-admin-bouquets'),
 ] + router.urls

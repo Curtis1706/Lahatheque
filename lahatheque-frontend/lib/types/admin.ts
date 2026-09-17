@@ -106,6 +106,7 @@ export interface AdminUser {
     short_name?: string;
     royalty_rate?: number;
     country?: string;
+    institution_type?: "partner" | "client";
   } | null;
   custom_remise_papier_pct?: number | null;
   custom_remise_numerique_pct?: number | null;
@@ -125,6 +126,8 @@ export interface CreateAdminUserPayload {
   institution_name?: string;
   institution_code?: string;
   institution_country?: string;
+  institution_type?: "partner" | "client";
+  institution_royalty_rate?: number;
   temporary_password?: string;
 }
 
@@ -139,6 +142,9 @@ export interface UpdateAdminUserPayload {
   institution_name?: string;
   institution_code?: string;
   institution_country?: string;
+  institution_type?: "partner" | "client";
+  institution_royalty_rate?: number;
+  royalty_rate_override?: number;
 }
 
 export interface AuthorUserDiscounts {

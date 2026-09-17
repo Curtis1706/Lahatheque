@@ -88,18 +88,42 @@ export function MobileBottomNav() {
             { label: "Profil", href: "/wholesaler/profile", icon: <UserIcon className="w-5 h-5" /> },
           ]
         };
-      case "university":
+      case "university": {
+        const instType =
+          (user as any)?.institution_detail?.institution_type ||
+          (user as any)?.university_profile?.institution_type ||
+          null;
+        const isPartner = instType === "partner";
+        const isClient = instType === "client";
+
+        // Pour les partenaires : Redevances en CTA ou à droite, pas de Bouquets
+        // Pour les clientes : Bouquets en CTA, Commandes à droite, zéro Redevance
+        if (isPartner) {
+          return {
+            leftItems: [
+              { label: "Aperçu", href: "/university", icon: <LayoutDashboard className="w-5 h-5" /> },
+              { label: "Catalogue", href: "/university/catalog", icon: <BookOpen className="w-5 h-5" /> },
+            ],
+            centerCta: { label: "Redevances", href: "/university/royalties", icon: <DollarSign className="w-6 h-6" /> },
+            rightItems: [
+              { label: "Commandes", href: "/university/purchases", icon: <PackageCheck className="w-5 h-5" /> },
+              { label: "Profil", href: "/university/profile", icon: <UserIcon className="w-5 h-5" /> },
+            ],
+          };
+        }
+
         return {
           leftItems: [
             { label: "Aperçu", href: "/university", icon: <LayoutDashboard className="w-5 h-5" /> },
-            { label: "Stats", href: "/university/stats", icon: <FileCheck className="w-5 h-5" /> },
+            { label: "Catalogue", href: "/university/catalog", icon: <BookOpen className="w-5 h-5" /> },
           ],
           centerCta: { label: "Bouquets", href: "/university/bouquets", icon: <Sparkles className="w-6 h-6" /> },
           rightItems: [
-            { label: "Redevances", href: "/university/royalties", icon: <DollarSign className="w-5 h-5" /> },
+            ...(!isClient ? [{ label: "Redevances", href: "/university/royalties", icon: <DollarSign className="w-5 h-5" /> }] : [{ label: "Commandes", href: "/university/purchases", icon: <PackageCheck className="w-5 h-5" /> }]),
             { label: "Profil", href: "/university/profile", icon: <UserIcon className="w-5 h-5" /> },
-          ]
+          ],
         };
+      }
       case "publisher":
         return {
           leftItems: [
@@ -271,17 +295,23 @@ export function MobileBottomNav() {
           { label: "Rapports Logistiques", href: "/manager/reports", icon: <FileSpreadsheet className="w-4 h-4" /> },
           { label: "Mon Profil", href: "/profile", icon: <UserIcon className="w-4 h-4" /> },
         ];
-      case "university":
+      case "university": {
+        const instType =
+          (user as any)?.institution_detail?.institution_type ||
+          (user as any)?.university_profile?.institution_type ||
+          null;
+        const isPartner = instType === "partner";
+        const isClient = instType === "client";
+
         return [
           { label: "Espace Université", href: "/university", icon: <LayoutDashboard className="w-4 h-4" /> },
-          { label: "Bouquets Documentaires", href: "/university/bouquets", icon: <Sparkles className="w-4 h-4" /> },
+          ...(!isPartner ? [{ label: "Bouquets Documentaires", href: "/university/bouquets", icon: <Sparkles className="w-4 h-4" /> }] : []),
           { label: "Catalogue Universitaire", href: "/university/catalog", icon: <BookOpen className="w-4 h-4" /> },
-          { label: "Statistiques d'Usage", href: "/university/stats", icon: <FileCheck className="w-4 h-4" /> },
-          { label: "Affiliations Étudiants", href: "/university/affiliations", icon: <GraduationCap className="w-4 h-4" /> },
           { label: "Achats Livres Papier", href: "/university/purchases", icon: <ShoppingBag className="w-4 h-4" /> },
-          { label: "Redevances", href: "/university/royalties", icon: <DollarSign className="w-4 h-4" /> },
+          ...(!isClient ? [{ label: "Redevances", href: "/university/royalties", icon: <DollarSign className="w-4 h-4" /> }] : []),
           { label: "Profil Établissement", href: "/university/profile", icon: <UserIcon className="w-4 h-4" /> },
         ];
+      }
       default:
         // Student / Client Lecteur
         return [
@@ -319,8 +349,13 @@ export function MobileBottomNav() {
         return "CHEF MAQUETTISTE • VALIDEUR";
       case "legal_reviewer":
         return "RELECTEUR JURIDIQUE";
-      case "university":
-        return "UNIVERSITÉ PARTENAIRE";
+      case "university": {
+        const instType =
+          (user as any)?.institution_detail?.institution_type ||
+          (user as any)?.university_profile?.institution_type ||
+          null;
+        return instType === "client" ? "UNIVERSITÉ CLIENTE" : "UNIVERSITÉ PARTENAIRE";
+      }
       case "manager":
         return "GESTIONNAIRE LOGISTIQUE";
       case "wholesaler":

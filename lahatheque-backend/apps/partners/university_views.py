@@ -50,19 +50,25 @@ class UniversityKpisView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsUniversityStaff]
 
     def get(self, request):
+        import logging
+        logger = logging.getLogger(__name__)
         user = request.user
         inst = get_user_institution(user)
+        logger.info(f"[UNIV KPIS] {timezone.now().isoformat()} - user={user.id} inst={'none' if not inst else inst.code} type={'none' if not inst else inst.institution_type}")
+
         if not inst:
             return Response({
                 "success": True,
                 "data": {
                     "institution_name": "Université Partenaire",
                     "institution_code": "UNIV",
+                    "institution_type": "partner",
                     "affiliated_students_count": 0,
                     "active_bouquets_count": 0,
                     "monthly_consultations_count": 0,
                     "total_royalties_available": 0.0,
                     "total_royalties_paid": 0.0,
+                    "revenue_split": None,
                     "currency": "XOF",
                     "consultations_trend_percent": 0.0,
                     "top_disciplines": [],
@@ -71,6 +77,110 @@ class UniversityKpisView(APIView):
                 "error": None
             })
 
+        # ── Branche Université Cliente : KPIs campus épurés, zéro redevance ──
+        if inst.institution_type == 'client':
+            return self._kpis_client(inst)
+
+        # ── Branche Université Partenaire : KPIs complets avec redevances ──
+        return self._kpis_partner(inst)
+
+    def _kpis_client(self, inst):
+        """KPIs pour Université Cliente — abonnements campus, lectures, commandes papier. Zéro redevance."""
+        import logging
+        logger = logging.getLogger(__name__)
+        from apps.reader.models import ReaderSession
+        from apps.student.models import ReadingSession as StudentReadingSession
+        from apps.audio.models import AudioListeningSession
+
+        affiliations_count = StudentAffiliation.objects.filter(
+            institution=inst,
+            status__in=['approved', 'active', 'validated']
+        ).count()
+        active_bouquets = UniversityBouquetSubscription.objects.filter(
+            institution=inst, status='active'
+        )
+        active_bouquets_count = active_bouquets.count()
+
+        # Ouvrages accessibles via bouquets souscrits actifs
+        from .models import BouquetOffering
+        accessible_books_ids = set()
+        for sub in active_bouquets:
+            offering = BouquetOffering.objects.filter(id=sub.offering_id).first() if sub.offering_id else None
+            if offering:
+                accessible_books_ids.update(
+                    offering.get_books_queryset(requesting_institution=inst).values_list('id', flat=True)
+                )
+        accessible_books_count = len(accessible_books_ids)
+
+        # Commandes papier institutionnelles
+        paper_orders_count = UniversityPaperOrder.objects.filter(institution=inst).count()
+
+        # Lectures campus (30 derniers jours)
+        monthly_reads = (
+            ReaderSession.objects.filter(
+                ouvrage_id__in=accessible_books_ids,
+                reading_time_seconds__gte=30,
+                created_at__gte=timezone.now() - timedelta(days=30)
+            ).count()
+            + StudentReadingSession.objects.filter(
+                ouvrage_id__in=accessible_books_ids,
+                duration_seconds__gte=30,
+                created_at__gte=timezone.now() - timedelta(days=30)
+            ).count()
+            + AudioListeningSession.objects.filter(
+                ouvrage_id__in=accessible_books_ids,
+                created_at__gte=timezone.now() - timedelta(days=30)
+            ).count()
+        ) if accessible_books_ids else 0
+
+        # Tendance consultations M vs M-1
+        prev_reads = (
+            ReaderSession.objects.filter(
+                ouvrage_id__in=accessible_books_ids,
+                reading_time_seconds__gte=30,
+                created_at__gte=timezone.now() - timedelta(days=60),
+                created_at__lt=timezone.now() - timedelta(days=30)
+            ).count()
+            + StudentReadingSession.objects.filter(
+                ouvrage_id__in=accessible_books_ids,
+                duration_seconds__gte=30,
+                created_at__gte=timezone.now() - timedelta(days=60),
+                created_at__lt=timezone.now() - timedelta(days=30)
+            ).count()
+        ) if accessible_books_ids else 0
+
+        if prev_reads > 0:
+            trend = round(((monthly_reads - prev_reads) / prev_reads) * 100, 1)
+        else:
+            trend = 0.0 if monthly_reads == 0 else 100.0
+
+        logger.info(f"[UNIV KPIS] {timezone.now().isoformat()} - CLIENT {inst.code}: bouquets={active_bouquets_count} livres={accessible_books_count} lectures={monthly_reads}")
+
+        return Response({
+            "success": True,
+            "data": {
+                "institution_name": inst.name,
+                "institution_code": inst.code,
+                "institution_type": "client",
+                "affiliated_students_count": affiliations_count,
+                "active_bouquets_count": active_bouquets_count,
+                "accessible_books_count": accessible_books_count,
+                "monthly_consultations_count": monthly_reads,
+                "paper_orders_count": paper_orders_count,
+                "total_royalties_available": 0.0,
+                "total_royalties_paid": 0.0,
+                "revenue_split": None,
+                "audience_share_percent": 0.0,
+                "currency": "XOF",
+                "consultations_trend_percent": trend,
+                "top_disciplines": [],
+                "faculty_distribution": [],
+            },
+            "error": None
+        })
+
+    def _kpis_partner(self, inst):
+        """KPIs complets pour Université Partenaire — redevances, répartition CA, parts d'audience."""
         from django.db.models import Q
         affiliations_count = StudentAffiliation.objects.filter(
             institution=inst, 
@@ -400,6 +510,8 @@ class UniversityBouquetSubscribeView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsUniversityStaff]
 
     def post(self, request, pk):
+        import logging
+        logger = logging.getLogger(__name__)
         from .models import BouquetOffering
         from apps.commerce.models import Currency, PaymentTransaction
         from apps.commerce.payment_providers import get_payment_provider
@@ -408,6 +520,14 @@ class UniversityBouquetSubscribeView(APIView):
         inst = get_user_institution(request.user)
         if not inst:
             return Response({"success": False, "error": "Université introuvable"}, status=400)
+
+        # ── Garde d'accès T013 : les universités partenaires ne souscrivent pas à des bouquets ──
+        if inst.institution_type == 'partner':
+            logger.warning(f"[UNIV ACCESS GUARD] {timezone.now().isoformat()} - 403 BLOCKED partner {inst.code} on /bouquets/subscribe")
+            return Response(
+                {"success": False, "error": "Les universités partenaires n'ont pas accès à la souscription de bouquets documentaires. Consultez votre portail de redevances.", "data": None},
+                status=status.HTTP_403_FORBIDDEN
+            )
 
         try:
             offering = BouquetOffering.objects.get(id=pk, is_active=True)
@@ -750,11 +870,23 @@ class UniversityPaperOrdersView(APIView):
 
 
 class UniversityRoyaltiesView(APIView):
-    """GET /api/v1/partners/university/royalties/ - Suivi des redevances et versements."""
+    """GET /api/v1/partners/university/royalties/ - Suivi des redevances et versements (Partenaires uniquement)."""
     permission_classes = [permissions.IsAuthenticated, IsUniversityStaff]
 
     def get(self, request):
+        import logging
+        logger = logging.getLogger(__name__)
         inst = get_user_institution(request.user)
+        logger.info(f"[UNIV ACCESS GUARD] {timezone.now().isoformat()} - royalties GET user={request.user.id} inst={'none' if not inst else inst.code} type={'none' if not inst else inst.institution_type}")
+
+        # ── Garde d'accès : les universités clientes ne peuvent pas consulter les redevances ──
+        if inst and inst.institution_type == 'client':
+            logger.warning(f"[UNIV ACCESS GUARD] {timezone.now().isoformat()} - 403 BLOCKED client {inst.code} on /royalties")
+            return Response(
+                {"success": False, "error": "Accès non autorisé. Les universités clientes n'ont pas accès au portail des redevances.", "data": None},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
         from apps.reporting.pricing_service import get_institution_royalty_rate
         rate = get_institution_royalty_rate(inst)
 
@@ -1011,11 +1143,23 @@ class UniversityRoyaltiesView(APIView):
 
 
 class UniversityRoyaltyWithdrawView(APIView):
-    """POST /api/v1/partners/university/royalties/withdraw/ - Demande de versement des redevances."""
+    """POST /api/v1/partners/university/royalties/withdraw/ - Demande de versement (Partenaires uniquement)."""
     permission_classes = [permissions.IsAuthenticated, IsUniversityStaff]
 
     def post(self, request):
+        import logging
+        logger = logging.getLogger(__name__)
         inst = get_user_institution(request.user)
+        logger.info(f"[UNIV ACCESS GUARD] {timezone.now().isoformat()} - royalties WITHDRAW user={request.user.id} inst={'none' if not inst else inst.code} type={'none' if not inst else inst.institution_type}")
+
+        # ── Garde d'accès : les universités clientes ne peuvent pas demander de versement ──
+        if inst and inst.institution_type == 'client':
+            logger.warning(f"[UNIV ACCESS GUARD] {timezone.now().isoformat()} - 403 BLOCKED client {inst.code} on /royalties/withdraw")
+            return Response(
+                {"success": False, "error": "Accès non autorisé. Les universités clientes ne perçoivent pas de redevances.", "data": None},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
         if not inst:
             return Response({"success": False, "error": "Université introuvable"}, status=400)
 
@@ -1374,5 +1518,103 @@ class BouquetRelevanceReportView(APIView):
                 "matched_disciplines": sorted(matched_disciplines),
             }
         })
+
+
+class UniversityClientCatalogView(APIView):
+    """GET /api/v1/partners/university/catalog/ - Ouvrages numériques accessibles via les bouquets actifs (Universités Clientes)."""
+    permission_classes = [permissions.IsAuthenticated, IsUniversityStaff]
+
+    def get(self, request):
+        import logging
+        logger = logging.getLogger(__name__)
+        from .models import BouquetOffering
+        from apps.catalog.models import Ouvrage
+
+        inst = get_user_institution(request.user)
+        logger.info(f"[UNIV CATALOG] {timezone.now().isoformat()} - catalog GET user={request.user.id} inst={'none' if not inst else inst.code} type={'none' if not inst else inst.institution_type}")
+
+        if not inst:
+            return Response({"success": True, "data": [], "error": None})
+
+        # Les partenaires n'ont pas de catalogue d'abonnement — leur catalogue = leurs ouvrages propres
+        if inst.institution_type == 'partner':
+            return Response(
+                {"success": False, "error": "Les universités partenaires accèdent à leurs ouvrages depuis leur portail de redevances.", "data": None},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # Collecter les ouvrages accessibles via les bouquets actifs souscrits
+        active_subs = UniversityBouquetSubscription.objects.filter(institution=inst, status='active')
+        accessible_ids: set = set()
+        bouquet_map: dict = {}  # book_id -> bouquet title(s)
+
+        for sub in active_subs:
+            offering = BouquetOffering.objects.filter(id=sub.offering_id).first() if sub.offering_id else None
+            if offering:
+                book_ids = list(offering.get_books_queryset(requesting_institution=inst).values_list('id', flat=True))
+                for bid in book_ids:
+                    accessible_ids.add(bid)
+                    bouquet_map.setdefault(str(bid), []).append(sub.title)
+
+        if not accessible_ids:
+            return Response({"success": True, "data": [], "error": None})
+
+        # Filtres optionnels
+        search = request.query_params.get("search", "").strip()
+        discipline = request.query_params.get("discipline", "").strip()
+        bouquet_id = request.query_params.get("bouquet_id", "").strip()
+
+        qs = Ouvrage.objects.filter(
+            id__in=accessible_ids,
+            status='published'
+        ).select_related('discipline', 'institution').prefetch_related('authors')
+
+        if search:
+            qs = qs.filter(Q(title__icontains=search) | Q(auteur__icontains=search) | Q(isbn__icontains=search))
+        if discipline:
+            qs = qs.filter(discipline__name__icontains=discipline)
+        if bouquet_id:
+            # Filtrer aux seuls ouvrages du bouquet demandé
+            try:
+                offering = BouquetOffering.objects.get(id=bouquet_id)
+                bouquet_book_ids = set(offering.get_books_queryset(requesting_institution=inst).values_list('id', flat=True))
+                qs = qs.filter(id__in=bouquet_book_ids)
+            except BouquetOffering.DoesNotExist:
+                pass
+
+        books = []
+        for book in qs.order_by('title')[:200]:
+            cover_url = ""
+            if book.cover_image:
+                try:
+                    cover_url = book.cover_image.url
+                except Exception:
+                    cover_url = str(book.cover_image)
+
+            authors = [
+                a.user.get_full_name() if (a.user and a.user.get_full_name()) else f"{a.first_name} {a.last_name}".strip()
+                for a in book.authors.all()
+            ] if hasattr(book, 'authors') else []
+            if not authors and book.auteur:
+                authors = [book.auteur]
+
+            books.append({
+                "id": str(book.id),
+                "title": book.title,
+                "authors": authors,
+                "isbn": book.isbn or "",
+                "cover_url": cover_url,
+                "discipline": book.discipline.name if book.discipline else "",
+                "institution_name": book.institution.name if book.institution else "",
+                "summary": (book.summary or "")[:300],
+                "publication_year": book.publication_year if hasattr(book, 'publication_year') else None,
+                "is_audio_available": getattr(book, 'is_audio_available', False),
+                "bouquets": bouquet_map.get(str(book.id), []),
+            })
+
+        logger.info(f"[UNIV CATALOG] {timezone.now().isoformat()} - CLIENT {inst.code}: {len(books)} ouvrages accessibles retournés")
+
+        return Response({"success": True, "data": books, "error": None})
+
 
 

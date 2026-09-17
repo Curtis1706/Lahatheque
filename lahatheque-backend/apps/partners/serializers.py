@@ -18,7 +18,7 @@ class InstitutionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Institution
-        fields = ['id', 'name', 'code', 'short_name', 'country', 'domain_name', 'royalty_rate', 'is_active', 'faculties', 'students_count']
+        fields = ['id', 'name', 'code', 'short_name', 'country', 'domain_name', 'institution_type', 'royalty_rate', 'is_active', 'faculties', 'students_count']
 
     def get_students_count(self, obj) -> int:
         if hasattr(obj, 'student_affiliations'):

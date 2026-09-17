@@ -142,24 +142,36 @@ export function DashboardSidebar() {
           },
         ];
 
-      case "university":
+      case "university": {
+        // Résolution du type d'institution depuis le cookie UI (propagé par le BFF sans appel réseau)
+        const institutionType =
+          (user as any)?.institution_detail?.institution_type ||
+          (user as any)?.university_profile?.institution_type ||
+          null; // null = indéterminé (affichage conservateur : tout visible)
+        const isPartner = institutionType === 'partner';
+        const isClient = institutionType === 'client';
+
+        const universityItems: NavLinkItem[] = [
+          { label: "Vue d'ensemble", href: "/university", icon: <LayoutDashboard className="size-4" /> },
+          // T014 : Bouquets masqués pour les partenaires (ils ne souscrivent pas)
+          ...(!isPartner ? [{ label: "Bouquets Documentaires", href: "/university/bouquets", icon: <Sparkles className="size-4" /> }] : []),
+          { label: "Catalogue Universitaire", href: "/university/catalog", icon: <BookOpen className="size-4" /> },
+          // { label: "Statistiques & Usage", href: "/university/stats", icon: <FileBarChart className="size-4" /> },
+          // { label: "Affiliations Étudiants", href: "/university/affiliations", icon: <GraduationCap className="size-4" /> },
+          { label: "Commandes", href: "/university/purchases", icon: <PackageCheck className="size-4" /> },
+          // T010 : Redevances masquées pour les universités clientes
+          ...(!isClient ? [{ label: "Redevances", href: "/university/royalties", icon: <DollarSign className="size-4" /> }] : []),
+          { label: "Profil & Paramètres", href: "/university/profile", icon: <Building2 className="size-4" /> },
+        ];
+
         return [
           {
             groupLabel: "Espace Université",
-            items: [
-              { label: "Vue d'ensemble", href: "/university", icon: <LayoutDashboard className="size-4" /> },
-              { label: "Bouquets Documentaires", href: "/university/bouquets", icon: <Sparkles className="size-4" /> },
-              { label: "Catalogue Universitaire", href: "/university/catalog", icon: <BookOpen className="size-4" /> },
-              // Masqué temporairement à la demande utilisateur :
-              // { label: "Statistiques & Usage", href: "/university/stats", icon: <FileBarChart className="size-4" /> },
-              // Désactivé conformément au CDC v3.2 — voir Fiches X1-X4.
-              // { label: "Affiliations Étudiants", href: "/university/affiliations", icon: <GraduationCap className="size-4" /> },
-              { label: "Commandes", href: "/university/purchases", icon: <PackageCheck className="size-4" /> },
-              { label: "Redevances", href: "/university/royalties", icon: <DollarSign className="size-4" /> },
-              { label: "Profil & Paramètres", href: "/university/profile", icon: <Building2 className="size-4" /> },
-            ],
+            items: universityItems,
           },
         ];
+      }
+
 
       case "manager":
         return [

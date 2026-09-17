@@ -1,3 +1,5 @@
+export type InstitutionType = "partner" | "client";
+
 export interface UniversityRevenueSplit {
   total_ca: number;
   university_amount: number;
@@ -11,8 +13,11 @@ export interface UniversityKpis {
   institution_id?: string;
   institution_name?: string;
   institution_code?: string;
+  institution_type?: InstitutionType;
   affiliated_students_count: number;
   active_bouquets_count: number;
+  catalog_books_count?: number;
+  accessible_books_count?: number;
   monthly_consultations_count: number;
   total_royalties_available: number;
   total_royalties_paid: number;
@@ -21,7 +26,7 @@ export interface UniversityKpis {
   faculty_distribution: { code: string; name: string; consultations: number; percent: number; color: string }[];
   consultations_trend_percent: number;
   audience_share_percent?: number;
-  revenue_split?: UniversityRevenueSplit;
+  revenue_split?: UniversityRevenueSplit | null;
 }
 
 export interface UniversityFacultyData {

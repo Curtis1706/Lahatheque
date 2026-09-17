@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   Layers,
@@ -17,6 +18,8 @@ import {
   subscribeUniversityBouquet,
 } from "@/lib/services/university";
 import type { UniversityBouquet } from "@/lib/types/university";
+import { useAuth } from "@/hooks/use-auth";
+import { toast } from "sonner";
 
 const getRollingTimeline = (count: number) => {
   const monthNames = ["Janv", "Févr", "Mars", "Avr", "Mai", "Juin", "Juil", "Août", "Sept", "Oct", "Nov", "Déc"];
@@ -33,10 +36,24 @@ const getRollingTimeline = (count: number) => {
 };
 
 export default function UniversityBouquetsPage() {
+  const { user } = useAuth();
+  const router = useRouter();
   const [bouquets, setBouquets] = useState<UniversityBouquet[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState<"all" | "available" | "active">("all");
+
+  // T016 : Redirection de sécurité — les universités partenaires n'ont pas accès aux bouquets
+  useEffect(() => {
+    const instType =
+      (user as any)?.institution_detail?.institution_type ||
+      (user as any)?.university_profile?.institution_type;
+    if (instType === "partner") {
+      console.info("[UNIV ACCESS GUARD]", new Date().toISOString(), "- Partner redirected from /bouquets to /university/royalties");
+      toast.info("En tant qu'université partenaire, votre espace est dédié au suivi des droits et redevances.");
+      router.replace("/university/royalties");
+    }
+  }, [user, router]);
 
   const loadData = async () => {
     setLoading(true);

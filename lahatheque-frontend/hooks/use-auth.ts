@@ -32,7 +32,26 @@ export interface User {
     verification_status: string;
     [key: string]: any;
   }
+  /** Profil d'institution (université partenaire ou cliente) — propagé depuis le cookie UI */
+  institution_detail?: {
+    id: string;
+    name: string;
+    code: string;
+    short_name?: string;
+    institution_type: 'partner' | 'client';
+    royalty_rate?: number;
+    country?: string;
+  } | null
+  /** Alias de institution_detail pour compatibilité historique */
+  university_profile?: {
+    id: string;
+    name: string;
+    code: string;
+    institution_type: 'partner' | 'client';
+    [key: string]: any;
+  } | null
 }
+
 
 export interface LoginResponse {
   success: boolean

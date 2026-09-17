@@ -419,6 +419,8 @@ export default function AdminRoleUsersPage() {
               const inst = (row as any).institution_detail || (row as any).institution;
               const instName = inst?.name || (row as any).institution_name || row.extra_info?.institution_name;
               const instCode = inst?.code || "";
+              const instType: "partner" | "client" = inst?.institution_type || "partner";
+              const isClient = instType === "client";
               const hasInstitution = Boolean(instName);
               return (
                 <div className="flex items-center gap-2.5">
@@ -430,13 +432,22 @@ export default function AdminRoleUsersPage() {
                   <div>
                     {hasInstitution ? (
                       <>
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-1.5 flex-wrap">
                           <p className="font-bold text-xs text-navy">{instName}</p>
                           {instCode && (
                             <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-gold/10 border border-gold/20 text-gold">
                               {instCode}
                             </span>
                           )}
+                          <span
+                            className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${
+                              isClient
+                                ? "bg-navy/5 border-navy/20 text-navy"
+                                : "bg-gold/10 border-gold/20 text-gold"
+                            }`}
+                          >
+                            {isClient ? "Cliente" : "Partenaire"}
+                          </span>
                         </div>
                         <p className="text-[11px] text-foreground-muted">{row.first_name} {row.last_name} · {row.email}</p>
                       </>
@@ -461,6 +472,14 @@ export default function AdminRoleUsersPage() {
             header: "Taux Conventionné",
             cell: (row) => {
               const inst = (row as any).institution_detail || (row as any).institution;
+              const isClient = inst?.institution_type === "client";
+              if (isClient) {
+                return (
+                  <span className="text-xs text-foreground-muted italic px-2 py-0.5 rounded bg-background-secondary border border-border">
+                    Non applicable
+                  </span>
+                );
+              }
               const rate = inst?.royalty_rate ?? 15.0;
               return (
                 <span className="text-xs font-bold font-mono px-2 py-0.5 rounded-full bg-gold/10 border border-gold/20 text-gold">
