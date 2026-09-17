@@ -8,43 +8,6 @@ import os
 import fitz
 from typing import Optional
 
-_cached_logo_bytes: Optional[bytes] = None
-
-def get_lahatheque_logo_bytes() -> Optional[bytes]:
-    """Récupère les octets du fichier logo.png officiel avec mise en cache et multi-résolution."""
-    global _cached_logo_bytes
-    if _cached_logo_bytes:
-        return _cached_logo_bytes
-
-    try:
-        from django.conf import settings
-        base_dir = getattr(settings, 'BASE_DIR', None)
-        static_root = getattr(settings, 'STATIC_ROOT', None)
-    except Exception:
-        base_dir = None
-        static_root = None
-
-    possible_paths = [
-        os.path.join(base_dir, "static", "logo.png") if base_dir else None,
-        os.path.join(static_root, "logo.png") if static_root else None,
-        os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "static", "logo.png")),
-        os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "lahatheque-frontend", "public", "logo.png")),
-        "/app/static/logo.png",
-        "/app/staticfiles/logo.png",
-        "e:/Lahatheque/lahatheque-backend/static/logo.png",
-        "e:/Lahatheque/lahatheque-frontend/public/logo.png",
-    ]
-
-    for p in possible_paths:
-        if p and os.path.exists(p):
-            try:
-                with open(p, "rb") as f:
-                    _cached_logo_bytes = f.read()
-                    return _cached_logo_bytes
-            except Exception:
-                pass
-    return None
-
 
 class PartnerIntegrationGuidePdfService:
     """
@@ -70,15 +33,9 @@ class PartnerIntegrationGuidePdfService:
         # Liseré Or
         page.draw_rect(fitz.Rect(0, 58, 595, 60), color=cls.GOLD, fill=cls.GOLD)
 
-        logo_bytes = get_lahatheque_logo_bytes()
-        if logo_bytes:
-            page.draw_rect(fitz.Rect(35, 10, 110, 50), color=cls.WHITE, fill=cls.WHITE, radius=3)
-            page.insert_image(fitz.Rect(37, 12, 108, 48), stream=logo_bytes, keep_proportion=True)
-            page.insert_text(fitz.Point(125, 36), "LAHATHÈQUE", fontsize=15, fontname="helv", color=cls.WHITE)
-            page.insert_text(fitz.Point(235, 36), "•  Guide d'Intégration Partenaire (Catalogue Seul)", fontsize=9.5, fontname="helv", color=cls.GOLD)
-        else:
-            page.insert_text(fitz.Point(40, 36), "LAHATHÈQUE", fontsize=16, fontname="helv", color=cls.WHITE)
-            page.insert_text(fitz.Point(155, 36), "•  Guide d'Intégration Partenaire (Catalogue Seul)", fontsize=10, fontname="helv", color=cls.GOLD)
+        # En-tête texte
+        page.insert_text(fitz.Point(40, 36), "LAHATHÈQUE", fontsize=16, fontname="helv", color=cls.WHITE)
+        page.insert_text(fitz.Point(155, 36), "•  Guide d'Intégration Partenaire (Catalogue Seul)", fontsize=10, fontname="helv", color=cls.GOLD)
 
         # Pied de page
         page.draw_line(fitz.Point(40, 800), fitz.Point(555, 800), color=cls.BORDER_LIGHT, width=0.8)
@@ -396,20 +353,12 @@ class BouquetInvoicePdfService:
         end_date = str(data.get("end_date", ""))
         is_univ = bool(data.get("is_university", True))
 
-        # 1. Bandeau supérieur Navy & Or avec Logo Officiel
-        p.draw_rect(fitz.Rect(0, 0, 595, 78), color=cls.NAVY, fill=cls.NAVY)
-        p.draw_rect(fitz.Rect(0, 76, 595, 78), color=cls.GOLD, fill=cls.GOLD)
+        # 1. Bandeau supérieur Navy & Or
+        p.draw_rect(fitz.Rect(0, 0, 595, 75), color=cls.NAVY, fill=cls.NAVY)
+        p.draw_rect(fitz.Rect(0, 73, 595, 75), color=cls.GOLD, fill=cls.GOLD)
 
-        logo_bytes = get_lahatheque_logo_bytes()
-        if logo_bytes:
-            # Encart blanc chic et propre pour le logo officiel LAHAThèque sur fond Navy
-            p.draw_rect(fitz.Rect(35, 12, 135, 66), color=cls.WHITE, fill=cls.WHITE, radius=3)
-            p.insert_image(fitz.Rect(38, 14, 132, 64), stream=logo_bytes, keep_proportion=True)
-            p.insert_text(fitz.Point(148, 42), "LAHATHÈQUE", fontsize=18, fontname="helv", color=cls.WHITE)
-            p.insert_text(fitz.Point(148, 58), "Éditions LAHA • Plateforme Académique Officielle", fontsize=8.5, fontname="helv", color=cls.GOLD)
-        else:
-            p.insert_text(fitz.Point(40, 42), "LAHATHÈQUE", fontsize=20, fontname="helv", color=cls.WHITE)
-            p.insert_text(fitz.Point(40, 58), "Éditions LAHA • Plateforme Académique Officielle", fontsize=8.5, fontname="helv", color=cls.GOLD)
+        p.insert_text(fitz.Point(40, 42), "LAHATHÈQUE", fontsize=20, fontname="helv", color=cls.WHITE)
+        p.insert_text(fitz.Point(40, 58), "Éditions LAHA • Plateforme Académique Officielle", fontsize=8.5, fontname="helv", color=cls.GOLD)
 
         p.insert_text(fitz.Point(410, 36), f"FACTURE N° {inv_num}", fontsize=11, fontname="helv", color=cls.WHITE)
         p.insert_text(fitz.Point(410, 52), f"Émise le {date_str}", fontsize=8.5, fontname="helv", color=cls.WHITE)
