@@ -621,6 +621,11 @@ def handle_bouquet_payment_success(payment_tx):
         csub.save(update_fields=['status'])
         logger.info(f"[Commerce] Bouquet client {csub.id} activé après paiement.")
         try:
+            from apps.student.views import invalidate_student_books_cache
+            invalidate_student_books_cache(csub.user_id)
+        except Exception as cache_err:
+            logger.warning(f"[Commerce] Erreur invalidation cache bibliothèque client {csub.user_id}: {cache_err}")
+        try:
             from apps.reporting.tasks import send_bouquet_subscription_emails
             send_bouquet_subscription_emails(str(csub.id))
         except Exception as mail_err:

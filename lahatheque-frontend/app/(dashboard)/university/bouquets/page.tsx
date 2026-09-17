@@ -10,6 +10,8 @@ import {
   CheckCircle2,
   Sparkles,
   HelpCircle,
+  Key,
+  FileText,
 } from "lucide-react";
 import { BouquetCard } from "@/components/features/university/bouquet-card";
 import { ProgressMetricCard } from "@/components/ui/progress-metric-card";
@@ -78,6 +80,11 @@ export default function UniversityBouquetsPage() {
           window.location.href = res.checkout_url;
           return true;
         }
+        if (res.subscription_id) {
+          toast.success("Souscription activée avec succès.");
+          window.location.href = `/university/bouquets/success?subscription_id=${res.subscription_id}`;
+          return true;
+        }
         toast.success("Souscription enregistrée avec succès.");
         await loadData();
         return true;
@@ -143,6 +150,28 @@ export default function UniversityBouquetsPage() {
           <p className="text-xs text-foreground-muted mt-1">
             Souscrivez aux packs de livres numériques pour vos facultés et exportez les catalogues officiels en Word (.doc).
           </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <a
+            href="/api/bff/partners/university/guides/catalog-only-pdf/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-4 py-2.5 rounded-xl bg-background border border-border hover:border-gold text-navy text-xs font-bold transition-colors inline-flex items-center gap-2 shadow-xs min-h-[44px]"
+          >
+            <FileText className="w-4 h-4 text-gold" />
+            <span>Guide d&apos;Intégration PDF</span>
+          </a>
+
+          {activeBouquets.length > 0 && (
+            <Link
+              href={`/university/bouquets/success?subscription_id=${activeBouquets[0].id}`}
+              className="px-4 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors inline-flex items-center gap-2 shadow-xs min-h-[44px]"
+            >
+              <Key className="w-4 h-4 text-gold" />
+              <span>Identifiants API Campus</span>
+            </Link>
+          )}
         </div>
       </div>
 

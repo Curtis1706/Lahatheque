@@ -19,6 +19,7 @@ import { DonutChart, type DonutChartSegment } from "@/components/ui/donut-chart"
 import { ProgressMetricCard } from "@/components/ui/progress-metric-card";
 import { FacultyStatsChart } from "@/components/features/university/faculty-stats-chart";
 import { BouquetCard } from "@/components/features/university/bouquet-card";
+import { toast } from "sonner";
 import {
   getUniversityKpis,
   getUniversityBouquets,
@@ -68,18 +69,32 @@ export default function UniversityOverviewPage() {
     loadData();
   }, []);
 
-  const handleSubscribe = async (bouquetId: string) => {
-    const ok = await subscribeUniversityBouquet(bouquetId);
-    if (ok) {
-      setBouquets((prev) =>
-        prev.map((b) =>
-          b.id === bouquetId
-            ? { ...b, status: "active", start_date: "2026-01-01", end_date: "2026-12-31" }
-            : b
-        )
-      );
+  const handleSubscribe = async (bouquetId: string, period: "monthly" | "annual" = "annual") => {
+    try {
+      const res = await subscribeUniversityBouquet(bouquetId, period);
+      if (res.success) {
+        if (res.checkout_url) {
+          toast.info("Redirection vers la passerelle de paiement sécurisée...");
+          window.location.href = res.checkout_url;
+          return true;
+        }
+        if (res.subscription_id) {
+          toast.success("Souscription activée avec succès.");
+          window.location.href = `/university/bouquets/success?subscription_id=${res.subscription_id}`;
+          return true;
+        }
+        toast.success("Souscription enregistrée avec succès.");
+        const bqData = await getUniversityBouquets();
+        if (bqData) setBouquets(bqData);
+        return true;
+      } else {
+        toast.error(res.error || "Échec de l'initialisation de la souscription.");
+        return false;
+      }
+    } catch (err: any) {
+      toast.error("Une erreur réseau est survenue lors de la souscription.");
+      return false;
     }
-    return ok;
   };
 
   if (loading || !kpis) {
