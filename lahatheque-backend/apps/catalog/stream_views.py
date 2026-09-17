@@ -149,7 +149,11 @@ class BookStreamView(APIView):
                 "error": "Impossible de charger le document sécurisé."
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-        # 5. Journalisation légale immuable dans TraceAcces (Fiche X3: 1 entrée par session de 5 minutes)
+        # 5. Détection de requête Range RFC 7233
+        range_header = request.META.get("HTTP_RANGE")
+        is_range_request = bool(range_header and range_header.startswith("bytes="))
+
+        # Journalisation légale immuable dans TraceAcces (Fiche X3: 1 entrée par session de 5 minutes)
         trace_throttle_key = f"trace_logged:{request.user.id}:{book_id}"
         if not django_cache.get(trace_throttle_key):
             try:
@@ -174,7 +178,7 @@ class BookStreamView(APIView):
                     country=country_code,
                     user_agent=request.META.get("HTTP_USER_AGENT", "")[:500],
                     device_fingerprint=device_fp[:255],
-                    access_type="read_chunk",
+                    access_type="read_chunk" if is_range_request else "read_full",
                     institution=institution_obj,
                     bouquet_subscription=bouquet_sub_obj,
                 )
@@ -182,38 +186,39 @@ class BookStreamView(APIView):
             except Exception as log_err:
                 logger.warning(f"Erreur enregistrement TraceAcces: {log_err}")
 
-        # 6. Traitement de l'en-tête HTTP Range (RFC 7233)
-        range_header = request.META.get("HTTP_RANGE")
-        if not range_header:
-            # DRM-01: Rejeter les requêtes sans en-tête Range pour bloquer l'aspiration et le téléchargement direct
-            response = HttpResponse(
-                b"En-tete Range obligatoire pour le streaming securise.",
-                status=status.HTTP_416_REQUESTED_RANGE_NOT_SATISFIABLE,
-                content_type="text/plain"
-            )
-            response["Accept-Ranges"] = "bytes"
-            response["Content-Range"] = f"bytes */{total_size}"
-            return response
+        # 6. Traitement de l'en-tête HTTP Range (RFC 7233 : support 200 complet & 206 partiel)
+        if is_range_request:
+            start_byte, end_byte = self._parse_range_header(range_header, total_size)
 
-        start_byte, end_byte = self._parse_range_header(range_header, total_size)
+            if start_byte is None or end_byte is None:
+                # Range Not Satisfiable
+                response = HttpResponse(status=status.HTTP_416_REQUESTED_RANGE_NOT_SATISFIABLE)
+                response["Accept-Ranges"] = "bytes"
+                response["Content-Range"] = f"bytes */{total_size}"
+                return response
 
-        if start_byte is None or end_byte is None:
-            # Range Not Satisfiable
-            response = HttpResponse(status=status.HTTP_416_REQUESTED_RANGE_NOT_SATISFIABLE)
-            response["Content-Range"] = f"bytes */{total_size}"
-            return response
+            # Découpage du fragment
+            chunk_data = pdf_bytes[start_byte : end_byte + 1]
+            chunk_length = len(chunk_data)
 
-        # Découpage du fragment
-        chunk_data = pdf_bytes[start_byte : end_byte + 1]
-        chunk_length = len(chunk_data)
+            # Réponse HTTP 206 Partial Content
+            response = HttpResponse(chunk_data, status=status.HTTP_206_PARTIAL_CONTENT, content_type="application/pdf")
+            response["Content-Range"] = f"bytes {start_byte}-{end_byte}/{total_size}"
+            response["Content-Length"] = str(chunk_length)
+        else:
+            # Réponse complète HTTP 200 (négociation initiale requise par PDF.js / FlipBook)
+            chunk_data = pdf_bytes
+            response = HttpResponse(chunk_data, status=status.HTTP_200_OK, content_type="application/pdf")
+            response["Content-Length"] = str(total_size)
 
-        # 7. Réponse HTTP 206 Partial Content avec en-têtes de sécurité
-        response = HttpResponse(chunk_data, status=status.HTTP_206_PARTIAL_CONTENT, content_type="application/pdf")
+        # 7. En-têtes de sécurité et streaming
         response["Accept-Ranges"] = "bytes"
-        response["Content-Range"] = f"bytes {start_byte}-{end_byte}/{total_size}"
-        response["Content-Length"] = str(chunk_length)
         response["Cache-Control"] = "private, no-store, must-revalidate"
+        response["Pragma"] = "no-cache"
         response["X-Content-Type-Options"] = "nosniff"
+        response["X-Frame-Options"] = "SAMEORIGIN"
+        safe_title = (doc_title or "document")[:50].replace('"', '')
+        response["Content-Disposition"] = f'inline; filename="{safe_title}.pdf"'
         return response
 
     def _parse_range_header(self, range_header: str, total_size: int) -> Tuple[Optional[int], Optional[int]]:
