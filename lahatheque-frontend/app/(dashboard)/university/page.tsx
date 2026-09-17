@@ -189,14 +189,14 @@ export default function UniversityOverviewPage() {
 
         <ProgressMetricCard
           title="Part d'Audience Moyenne"
-          total="38.5 %"
+          total={`${kpis.audience_share_percent != null ? kpis.audience_share_percent : 0} %`}
           percent="Usage réel"
           trend="up"
           accent="emerald"
           delta="Consultations"
           deltaLabel="au prorata officiel"
           defaultView="bar"
-          data={getRollingTimeline(38)}
+          data={getRollingTimeline(kpis.audience_share_percent ? Math.round(kpis.audience_share_percent) : 0)}
         />
 
         <ProgressMetricCard
@@ -324,13 +324,16 @@ export default function UniversityOverviewPage() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {bouquets.slice(0, 2).map((bq) => (
-            <BouquetCard
-              key={bq.id}
-              bouquet={bq}
-              onSubscribe={handleSubscribe}
-            />
-          ))}
+          {bouquets
+            .filter((b) => (b.bouquet_type as string) !== "general" && !b.title.toLowerCase().includes("général") && !b.title.toLowerCase().includes("general"))
+            .slice(0, 2)
+            .map((bq) => (
+              <BouquetCard
+                key={bq.id}
+                bouquet={bq}
+                onSubscribe={handleSubscribe}
+              />
+            ))}
         </div>
       </div>
 

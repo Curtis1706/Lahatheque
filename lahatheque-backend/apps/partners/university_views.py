@@ -85,8 +85,48 @@ class UniversityKpisView(APIView):
             timestamp__gte=timezone.now() - timedelta(days=30)
         ).count()
 
+        # ── Intégration dynamique des consultations et redevances du Bouquet Général ──
+        from apps.reporting.admin_views import compute_bouquet_distribution_payload
+        from apps.reader.models import ReaderSession
+        from apps.student.models import ReadingSession as StudentReadingSession
+        from apps.audio.models import AudioListeningSession
+
+        partner_reads = ReaderSession.objects.filter(
+            ouvrage__institution=inst,
+            reading_time_seconds__gte=30,
+            last_page__gte=3,
+            created_at__gte=timezone.now() - timedelta(days=30)
+        ).count()
+
+        student_reads = StudentReadingSession.objects.filter(
+            ouvrage__institution=inst,
+            duration_seconds__gte=30,
+            pages_read__gte=3,
+            created_at__gte=timezone.now() - timedelta(days=30)
+        ).count()
+
+        audio_reads = AudioListeningSession.objects.filter(
+            ouvrage__institution=inst,
+            created_at__gte=timezone.now() - timedelta(days=30)
+        ).count()
+
+        total_monthly_consultations = monthly_consultations + partner_reads + student_reads + audio_reads
+
+        # Récupération de la part temps réel du Bouquet Général pour l'établissement
+        bouquet_general_data = compute_bouquet_distribution_payload("general", requesting_institution_id=str(inst.id))
+        general_ca = 0.0
+        general_royalty = 0.0
+        inst_audience_pct = 0.0
+        if bouquet_general_data and "distribution" in bouquet_general_data:
+            for item in bouquet_general_data["distribution"]:
+                if str(item.get("institution_id")) == str(inst.id):
+                    general_ca = float(item.get("ca_share", 0.0) or 0.0)
+                    general_royalty = float(item.get("royalty_amount", 0.0) or 0.0)
+                    inst_audience_pct = float(item.get("usage_percentage", 0.0) or 0.0)
+                    break
+
         statements = UniversityRoyaltyStatement.objects.filter(institution=inst)
-        avail_royalty = float(statements.filter(status='available').aggregate(s=Sum('net_royalty_amount'))['s'] or 0.0)
+        avail_royalty = float(statements.filter(status='available').aggregate(s=Sum('net_royalty_amount'))['s'] or 0.0) + general_royalty
         paid_royalty = float(statements.filter(status='paid').aggregate(s=Sum('net_royalty_amount'))['s'] or 0.0)
 
         faculties = Faculty.objects.filter(institution=inst)
@@ -134,22 +174,25 @@ class UniversityKpisView(APIView):
                 for item in faculty_distrib:
                     item["percent"] = round((item["consultations"] / total_disc_c) * 100, 1)
 
-        total_ca = statements.aggregate(s=Sum('total_sales_catalog'))['s'] or Decimal('0.00')
-        total_university_share = statements.aggregate(s=Sum('net_royalty_amount'))['s'] or Decimal('0.00')
-        total_laha_share = total_ca - total_university_share
+        raw_stmt_ca = float(statements.aggregate(s=Sum('total_sales_catalog'))['s'] or Decimal('0.00'))
+        raw_stmt_univ = float(statements.aggregate(s=Sum('net_royalty_amount'))['s'] or Decimal('0.00'))
+
+        total_ca = raw_stmt_ca + general_ca
+        total_university_share = raw_stmt_univ + general_royalty
+        total_laha_share = max(0.0, total_ca - total_university_share)
 
         if total_ca > 0:
-            university_share_percent = round(float(total_university_share / total_ca) * 100, 1)
+            university_share_percent = round((total_university_share / total_ca) * 100, 1)
             laha_share_percent = round(100 - university_share_percent, 1)
         else:
             university_share_percent = 0.0
             laha_share_percent = 0.0
 
         revenue_split = {
-            "total_ca": float(total_ca),
-            "university_amount": float(total_university_share),
+            "total_ca": round(total_ca, 2),
+            "university_amount": round(total_university_share, 2),
             "university_percent": university_share_percent,
-            "laha_amount": float(total_laha_share),
+            "laha_amount": round(total_laha_share, 2),
             "laha_percent": laha_share_percent,
             "currency": "XOF",
         }
@@ -163,10 +206,10 @@ class UniversityKpisView(APIView):
 
         if previous_month_consultations > 0:
             consultations_trend = round(
-                ((monthly_consultations - previous_month_consultations) / previous_month_consultations) * 100, 1
+                ((total_monthly_consultations - previous_month_consultations) / previous_month_consultations) * 100, 1
             )
         else:
-            consultations_trend = 0.0 if monthly_consultations == 0 else 100.0
+            consultations_trend = 0.0 if total_monthly_consultations == 0 else 100.0
 
         return Response({
             "success": True,
@@ -175,9 +218,10 @@ class UniversityKpisView(APIView):
                 "institution_code": inst.code,
                 "affiliated_students_count": affiliations_count,
                 "active_bouquets_count": bouquets_count,
-                "monthly_consultations_count": monthly_consultations,
-                "total_royalties_available": avail_royalty,
+                "monthly_consultations_count": total_monthly_consultations,
+                "total_royalties_available": round(avail_royalty, 2),
                 "total_royalties_paid": paid_royalty,
+                "audience_share_percent": inst_audience_pct,
                 "currency": "XOF",
                 "consultations_trend_percent": consultations_trend,
                 "top_disciplines": top_disc,
@@ -271,7 +315,7 @@ class UniversityBouquetsView(APIView):
                     subscribed_offering_ids.add(str(b.offering_id))
 
         available_data = []
-        for o in BouquetOffering.objects.filter(is_active=True).exclude(id__in=subscribed_offering_ids):
+        for o in BouquetOffering.objects.filter(is_active=True).exclude(id__in=subscribed_offering_ids).exclude(bouquet_type="general"):
             b_qs = o.get_books_queryset(requesting_institution=inst)
             available_data.append({
                 "id": str(o.id),
@@ -367,6 +411,8 @@ class UniversityBouquetSubscribeView(APIView):
 
         try:
             offering = BouquetOffering.objects.get(id=pk, is_active=True)
+            if offering.bouquet_type == "general":
+                return Response({"success": False, "error": "Le Bouquet Général est un bouquet système global et n'est pas ouvert à la souscription directe."}, status=400)
         except BouquetOffering.DoesNotExist:
             return Response({"success": False, "error": "Bouquet introuvable ou indisponible."}, status=404)
 
@@ -748,8 +794,36 @@ class UniversityRoyaltiesView(APIView):
                 "pdf_statement_url": r.pdf_statement_url or None,
                 "created_at": r.created_at.isoformat() if r.created_at else str(timezone.now())
             })
-        avail_bal = float(qs.filter(status='available').aggregate(s=Sum('net_royalty_amount'))['s'] or 0.0)
+
+        # ── Intégration en temps réel des redevances du Bouquet Général ──
+        from apps.reporting.admin_views import compute_bouquet_distribution_payload
+        bouquet_general_data = compute_bouquet_distribution_payload("general", requesting_institution_id=str(inst.id))
+        general_ca = 0.0
+        general_royalty = 0.0
+        if bouquet_general_data and "distribution" in bouquet_general_data:
+            for item in bouquet_general_data["distribution"]:
+                if str(item.get("institution_id")) == str(inst.id):
+                    general_ca = float(item.get("ca_share", 0.0) or 0.0)
+                    general_royalty = float(item.get("royalty_amount", 0.0) or 0.0)
+                    break
+
+        avail_bal = float(qs.filter(status='available').aggregate(s=Sum('net_royalty_amount'))['s'] or 0.0) + general_royalty
         total_paid = float(qs.filter(status='paid').aggregate(s=Sum('net_royalty_amount'))['s'] or 0.0)
+
+        if general_royalty > 0:
+            statements.insert(0, {
+                "id": "bouquet-general-realtime",
+                "reference": "REP-BOUQ-GENERAL",
+                "period": "En cours (Bouquet Général)",
+                "total_sales_catalog": general_ca,
+                "royalty_rate": rate,
+                "applied_rate": rate,
+                "net_royalty_amount": general_royalty,
+                "currency": "XOF",
+                "status": "available",
+                "pdf_statement_url": None,
+                "created_at": timezone.now().isoformat()
+            })
 
         # Extraction des ventes unitaires réelles des ouvrages de l'institution
         from apps.commerce.models import LigneCommande

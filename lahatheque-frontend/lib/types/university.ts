@@ -20,6 +20,7 @@ export interface UniversityKpis {
   top_disciplines: { discipline: string; consultations: number; percent: number }[];
   faculty_distribution: { code: string; name: string; consultations: number; percent: number; color: string }[];
   consultations_trend_percent: number;
+  audience_share_percent?: number;
   revenue_split?: UniversityRevenueSplit;
 }
 
@@ -36,7 +37,7 @@ export interface UniversityBouquet {
   id: string;
   offering_id?: string | null;
   title: string;
-  bouquet_type: "discipline" | "faculty" | "university" | "custom";
+  bouquet_type: "discipline" | "faculty" | "university" | "custom" | "general";
   faculty_code?: string;
   discipline?: string;
   books_count: number;

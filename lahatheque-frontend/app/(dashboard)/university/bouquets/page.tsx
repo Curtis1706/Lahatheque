@@ -42,7 +42,11 @@ export default function UniversityBouquetsPage() {
     setLoading(true);
     try {
       const data = await getUniversityBouquets();
-      setBouquets(data);
+      setBouquets(
+        (data || []).filter(
+          (b) => (b.bouquet_type as string) !== "general" && !b.title.toLowerCase().includes("général") && !b.title.toLowerCase().includes("general")
+        )
+      );
     } catch {
       // Erreur gérée au niveau service
     } finally {
