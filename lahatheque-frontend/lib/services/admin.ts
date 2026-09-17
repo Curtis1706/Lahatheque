@@ -1435,12 +1435,23 @@ export interface BouquetOfferingBooksPreviewResponse {
   target_institution?: string | null;
   target_institution_name?: string | null;
   books_count: number;
+  current_page?: number;
+  page_size?: number;
+  total_pages?: number;
   books: InstitutionBookPreviewItem[];
 }
 
-export async function getBouquetOfferingBooksPreview(bouquetId: string): Promise<BouquetOfferingBooksPreviewResponse | null> {
+export async function getBouquetOfferingBooksPreview(
+  bouquetId: string,
+  params?: { page?: number; page_size?: number; q?: string }
+): Promise<BouquetOfferingBooksPreviewResponse | null> {
   try {
-    const res = await fetch(`/api/bff/admin/bouquet-offerings/${bouquetId}/`, {
+    const query = new URLSearchParams();
+    if (params?.page) query.set("page", String(params.page));
+    if (params?.page_size) query.set("page_size", String(params.page_size));
+    if (params?.q) query.set("q", params.q.trim());
+    const qs = query.toString() ? `?${query.toString()}` : "";
+    const res = await fetch(`/api/bff/admin/bouquet-offerings/${bouquetId}/${qs}`, {
       credentials: "include",
       cache: "no-store",
     });

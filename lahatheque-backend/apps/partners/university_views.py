@@ -476,7 +476,7 @@ class UniversityBouquetsView(APIView):
 
         def serialize_bouquet_books(qs):
             books_data = []
-            for bk in qs.select_related('discipline', 'institution').prefetch_related('authors')[:60]:
+            for bk in qs.select_related('discipline', 'institution').prefetch_related('authors'):
                 cover_url = None
                 if bk.cover_image:
                     try:

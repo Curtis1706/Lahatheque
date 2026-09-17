@@ -149,7 +149,11 @@ class OuvrageBasicSerializer(serializers.ModelSerializer):
     def _get_real_stock(self, obj) -> int:
         stock_map = self.context.get('stock_map')
         if stock_map is not None:
-            return stock_map.get(obj.id, 0)
+            if obj.id in stock_map:
+                return stock_map[obj.id]
+            if str(obj.id) in stock_map:
+                return stock_map[str(obj.id)]
+            return 0
         if hasattr(obj, '_cached_real_stock'):
             return obj._cached_real_stock
         from apps.commerce.models import get_real_paper_stock
@@ -385,7 +389,7 @@ class BouquetSerializer(serializers.ModelSerializer):
                 b_qs = b_qs.filter(institution=obj.institution)
 
         books_data = []
-        for bk in b_qs.select_related('discipline').prefetch_related('authors')[:60]:
+        for bk in b_qs.select_related('discipline').prefetch_related('authors'):
             cover_url = None
             if bk.cover_image:
                 try:

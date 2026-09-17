@@ -4120,9 +4120,48 @@ class AdminBouquetOfferingDetailView(APIView):
             return Response({"success": False, "error": "Bouquet introuvable."}, status=404)
 
         books_qs = offering.get_books_queryset().select_related('discipline').prefetch_related('authors').order_by('title')
+
+        q = request.GET.get('q', '').strip()
+        if q:
+            from django.db.models import Q
+            books_qs = books_qs.filter(
+                Q(title__icontains=q) |
+                Q(discipline__name__icontains=q) |
+                Q(authors__first_name__icontains=q) |
+                Q(authors__last_name__icontains=q)
+            ).distinct()
+
         total_count = books_qs.count()
+
+        page_str = request.GET.get('page')
+        page_size_str = request.GET.get('page_size', '24')
+        is_all = request.GET.get('all') in ('1', 'true', 'True') or page_size_str == 'all'
+
+        if is_all:
+            page = 1
+            page_size = total_count or 1
+            total_pages = 1
+            books_slice = books_qs
+        else:
+            try:
+                page_size = max(1, min(100, int(page_size_str)))
+            except (ValueError, TypeError):
+                page_size = 24
+
+            try:
+                page = max(1, int(page_str or 1))
+            except (ValueError, TypeError):
+                page = 1
+
+            total_pages = max(1, (total_count + page_size - 1) // page_size)
+            if page > total_pages:
+                page = total_pages
+            start = (page - 1) * page_size
+            end = start + page_size
+            books_slice = books_qs[start:end]
+
         books_list = []
-        for book in books_qs[:100]:
+        for book in books_slice:
             cover_url = ""
             if book.cover_image:
                 try:
@@ -4162,6 +4201,9 @@ class AdminBouquetOfferingDetailView(APIView):
                 "target_institution": str(offering.target_institution_id) if offering.target_institution_id else None,
                 "target_institution_name": offering.target_institution.name if offering.target_institution else None,
                 "books_count": total_count,
+                "current_page": page,
+                "page_size": page_size,
+                "total_pages": total_pages,
                 "books": books_list,
             }
         })
