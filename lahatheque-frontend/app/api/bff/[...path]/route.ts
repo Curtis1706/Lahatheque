@@ -85,17 +85,32 @@ async function handleProxy(request: NextRequest, { params }: { params: Promise<{
   if (request.method !== 'GET' && request.method !== 'HEAD') {
     try {
       if (contentType && contentType.includes('multipart/form-data')) {
-        // Pour les uploads multipart, lire le Buffer complet et définir le Content-Length exact requis par WSGI/Django
+        // Pour les uploads multipart, lire le Buffer complet
         const arrayBuffer = await request.arrayBuffer()
         body = Buffer.from(arrayBuffer)
-        headers.set('content-length', String(body.byteLength))
-        console.log(`[BFF Proxy] Multipart reçu (${(body.byteLength / (1024 * 1024)).toFixed(2)} Mo) -> transmission avec Content-Length vers ${targetUrl}`)
+        console.log(`[BFF Proxy] Multipart reçu (${(body.byteLength / (1024 * 1024)).toFixed(2)} Mo) -> transmission vers ${targetUrl}`)
       } else {
         body = await request.text()
       }
     } catch (readErr) {
       console.error(`[BFF Proxy ERROR] Erreur lecture du body :`, readErr)
       body = undefined
+    }
+  }
+
+  // Conversion en objet plain pour contourner les restrictions WHATWG Forbidden Headers sur Content-Length
+  const proxyHeaders: Record<string, string> = {}
+  headers.forEach((val, key) => {
+    if (key.toLowerCase() !== 'transfer-encoding') {
+      proxyHeaders[key.toLowerCase()] = val
+    }
+  })
+
+  if (body) {
+    if (Buffer.isBuffer(body)) {
+      proxyHeaders['content-length'] = String(body.byteLength)
+    } else if (typeof body === 'string') {
+      proxyHeaders['content-length'] = String(Buffer.byteLength(body, 'utf-8'))
     }
   }
 
@@ -112,14 +127,12 @@ async function handleProxy(request: NextRequest, { params }: { params: Promise<{
 
     const fetchOptions: RequestInit = {
       method: request.method,
-      headers: headers,
+      headers: proxyHeaders,
       body: body || undefined,
       cache: 'no-store',
       signal: fetchController.signal,
-    }
-    if (body && typeof (body as any).getReader === 'function') {
       // @ts-ignore
-      fetchOptions.duplex = 'half'
+      duplex: 'half',
     }
 
     try {

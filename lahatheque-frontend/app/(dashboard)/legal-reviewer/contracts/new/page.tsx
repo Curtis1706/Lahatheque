@@ -22,6 +22,7 @@ import {
 import { useAuth } from "@/hooks/use-auth";
 import { FileDropzone } from "@/components/features/layout-artist/file-dropzone";
 import { SearchableSelect } from "@/components/ui/searchable-select";
+import { BookCover3D } from "@/components/ui/book-cover-3d";
 import { DatePicker } from "@/components/ui/date-picker";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { getContractFormOptions, createLegalContract } from "@/lib/services/legal";
@@ -218,6 +219,7 @@ function NewLegalContractContent() {
       label: b.title,
       subtitle: b.isbn ? `ISBN: ${b.isbn}` : (b.authors?.join(", ") || "Ouvrage LAHA"),
       badge: b.status === "validated" ? "Validé" : (b.status || "Catalogue"),
+      image: b.cover_url || "fallback",
     }));
   }, [options]);
 
@@ -591,29 +593,59 @@ function NewLegalContractContent() {
                   />
 
                   {selectedBook && (
-                    <div className="mt-2 p-3 rounded-xl bg-background border border-border flex flex-wrap gap-4">
-                      <div>
-                        <span className="text-[10px] font-bold text-foreground-muted uppercase block">Prix Numérique</span>
-                        <span className="text-sm font-semibold text-navy">
-                          {selectedBook.price_digital != null ? `${selectedBook.price_digital.toLocaleString("fr-FR")} FCFA` : "Non défini"}
-                        </span>
+                    <div className="mt-3 p-3.5 rounded-2xl bg-background-secondary border border-border flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                      <BookCover3D
+                        title={selectedBook.title}
+                        authors={selectedBook.authors}
+                        coverUrl={selectedBook.cover_url}
+                        size="sm"
+                        interactive={false}
+                      />
+                      <div className="flex-1 min-w-0 space-y-2">
+                        <div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-[9px] font-mono font-bold uppercase bg-gold/15 text-navy px-2 py-0.5 rounded border border-gold/30">
+                              Ouvrage rattaché
+                            </span>
+                            {selectedBook.isbn && (
+                              <span className="text-[10px] text-foreground-muted font-mono">
+                                ISBN : {selectedBook.isbn}
+                              </span>
+                            )}
+                          </div>
+                          <h4 className="font-serif font-bold text-sm text-navy leading-snug line-clamp-2 mt-1">
+                            {selectedBook.title}
+                          </h4>
+                          <p className="text-xs text-foreground-muted font-medium mt-0.5">
+                            {selectedBook.authors?.join(", ") || "Auteur LAHA"}
+                          </p>
+                        </div>
+
+                        <div className="flex flex-wrap gap-2 pt-1 border-t border-border">
+                          <div className="px-2.5 py-1 rounded-lg bg-background border border-border">
+                            <span className="text-[9px] font-bold text-foreground-muted uppercase tracking-wider block">Numérique</span>
+                            <span className="text-xs font-semibold text-navy">
+                              {selectedBook.price_digital != null ? `${selectedBook.price_digital.toLocaleString("fr-FR")} FCFA` : "Non défini"}
+                            </span>
+                          </div>
+                          {selectedBook.is_paper_available && (
+                            <div className="px-2.5 py-1 rounded-lg bg-background border border-border">
+                              <span className="text-[9px] font-bold text-foreground-muted uppercase tracking-wider block">Papier</span>
+                              <span className="text-xs font-semibold text-navy">
+                                {selectedBook.price_paper != null ? `${selectedBook.price_paper.toLocaleString("fr-FR")} FCFA` : "Non défini"}
+                              </span>
+                            </div>
+                          )}
+                          {selectedBook.has_audio_tracks && (
+                            <div className="px-2.5 py-1 rounded-lg bg-background border border-border">
+                              <span className="text-[9px] font-bold text-foreground-muted uppercase tracking-wider block">Audio</span>
+                              <span className="text-xs font-semibold text-navy">
+                                {selectedBook.price_audio != null ? `${selectedBook.price_audio.toLocaleString("fr-FR")} FCFA` : "Non défini"}
+                              </span>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                      {selectedBook.is_paper_available && (
-                        <div>
-                          <span className="text-[10px] font-bold text-foreground-muted uppercase block">Prix Papier</span>
-                          <span className="text-sm font-semibold text-navy">
-                            {selectedBook.price_paper != null ? `${selectedBook.price_paper.toLocaleString("fr-FR")} FCFA` : "Non défini"}
-                          </span>
-                        </div>
-                      )}
-                      {selectedBook.has_audio_tracks && (
-                        <div>
-                          <span className="text-[10px] font-bold text-foreground-muted uppercase block">Prix Livre Audio</span>
-                          <span className="text-sm font-semibold text-navy">
-                            {selectedBook.price_audio != null ? `${selectedBook.price_audio.toLocaleString("fr-FR")} FCFA` : "Non défini"}
-                          </span>
-                        </div>
-                      )}
                     </div>
                   )}
                 </div>

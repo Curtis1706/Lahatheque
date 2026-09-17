@@ -484,8 +484,8 @@ export default function NewPublisherBookPage() {
 
       toast.success("L'ouvrage, son manuscrit et sa couverture ont été enregistrés avec succès dans la base de données.");
       router.push("/publisher/catalog");
-    } catch {
-      toast.error("Erreur lors du dépôt de l'ouvrage. Veuillez réessayer.");
+    } catch (err: any) {
+      toast.error(err?.message || "Erreur lors du dépôt de l'ouvrage. Veuillez réessayer.");
     } finally {
       setSubmitting(false);
     }
