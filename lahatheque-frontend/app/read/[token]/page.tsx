@@ -138,7 +138,16 @@ export default function HostedReaderPage() {
 
     try {
       const activeToken = session?.session_token || hostedReaderApi.getActiveToken(token) || token;
-      const targetUrl = `/api/bff/reader/sessions/stream/?lang=${newLang}&token=${encodeURIComponent(activeToken)}`;
+      let targetUrl: string;
+      if (typeof window !== "undefined") {
+        const isProd = window.location.hostname.includes("lahatheque.com");
+        const baseApi = process.env.NEXT_PUBLIC_API_URL
+          ? process.env.NEXT_PUBLIC_API_URL.replace(/\/+$/, "").replace(/\/v1$/, "")
+          : (isProd ? "https://api.lahatheque.com/api" : "http://localhost:8000/api");
+        targetUrl = `${baseApi}/v1/reader/sessions/stream/?lang=${newLang}&token=${encodeURIComponent(activeToken)}`;
+      } else {
+        targetUrl = `/api/bff/reader/sessions/stream?lang=${newLang}&token=${encodeURIComponent(activeToken)}`;
+      }
       setRawPdfData(targetUrl);
       toast.success(`Langue basculée en ${newLang.toUpperCase()} (Page ${newPage1Based})`);
     } catch (err) {
@@ -219,24 +228,53 @@ export default function HostedReaderPage() {
   useEffect(() => {
     if (!session || !token) return;
 
-    // Le flux protégé est servi directement par fragments Range sans téléchargement préalable de Blob
+    // Pour permettre les requêtes partielles HTTP 206 RFC 7233 sans dégradation ni stripping
+    // des en-têtes Content-Length / Accept-Ranges par le proxy intermédiaire Node.js BFF,
+    // on résout l'URL de streaming direct vers l'API backend Django en environnement navigateur.
     const initialLang = (session.book?.language || currentLanguage || "fr").toLowerCase();
     const activeToken = session?.session_token || hostedReaderApi.getActiveToken(token) || token;
-    const targetUrl = `/api/bff/reader/sessions/stream/?lang=${initialLang}&token=${encodeURIComponent(activeToken)}`;
+    let targetUrl: string;
+    if (typeof window !== "undefined") {
+      const isProd = window.location.hostname.includes("lahatheque.com");
+      const baseApi = process.env.NEXT_PUBLIC_API_URL
+        ? process.env.NEXT_PUBLIC_API_URL.replace(/\/+$/, "").replace(/\/v1$/, "")
+        : (isProd ? "https://api.lahatheque.com/api" : "http://localhost:8000/api");
+      targetUrl = `${baseApi}/v1/reader/sessions/stream/?lang=${initialLang}&token=${encodeURIComponent(activeToken)}`;
+    } else {
+      targetUrl = `/api/bff/reader/sessions/stream?lang=${initialLang}&token=${encodeURIComponent(activeToken)}`;
+    }
 
     setRawPdfData(targetUrl);
   }, [session, token, currentLanguage]);
+
+  // Générateur d'URL par page dérivée ultra-rapide (Modèle Scribd / Internet Archive)
+  const pageUrlTemplate = useCallback(
+    (page: number) => {
+      const activeToken = session?.session_token || hostedReaderApi.getActiveToken(token) || token;
+      const initialLang = (session?.book?.language || currentLanguage || "fr").toLowerCase();
+      if (typeof window !== "undefined") {
+        const isProd = window.location.hostname.includes("lahatheque.com");
+        const baseApi = process.env.NEXT_PUBLIC_API_URL
+          ? process.env.NEXT_PUBLIC_API_URL.replace(/\/+$/, "").replace(/\/v1$/, "")
+          : (isProd ? "https://api.lahatheque.com/api" : "http://localhost:8000/api");
+        return `${baseApi}/v1/reader/sessions/page/?page=${page}&lang=${initialLang}&token=${encodeURIComponent(activeToken)}`;
+      }
+      return `/api/bff/reader/sessions/page?page=${page}&lang=${initialLang}&token=${encodeURIComponent(activeToken)}`;
+    },
+    [session, token, currentLanguage]
+  );
 
   const transformPdfGetDocumentParams = useCallback(
     (options: any) => ({
       ...options,
       httpHeaders: streamHeaders,
       withCredentials: true,
-      disableStream: true,
+      disableStream: false,
       disableAutoFetch: true,
       rangeChunkSize: 128 * 1024,
+      ...(session?.book?.file_size ? { length: session.book.file_size } : {}),
     }),
-    [streamHeaders]
+    [streamHeaders, session?.book?.file_size]
   );
 
   const setViewerRenderRange = useCallback((range: { startPage: number; numPages: number }) => {
@@ -800,6 +838,9 @@ export default function HostedReaderPage() {
             bookId={session.book.id}
             authorName={session.book.author}
             fileUrl={rawPdfData}
+            fileSize={session.book.file_size}
+            pageUrlTemplate={pageUrlTemplate}
+            totalPages={totalPages || session.book.total_pages}
             initialPage={currentPage}
             hideInternalHeader={true}
             watermarkMode="partner"

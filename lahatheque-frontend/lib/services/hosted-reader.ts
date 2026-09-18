@@ -51,6 +51,7 @@ export interface HostedReaderBookInfo {
   author: string;
   cover_url?: string | null;
   file_url?: string | null;
+  file_size?: number;
   total_pages: number;
   has_audio: boolean;
   audio_url?: string | null;

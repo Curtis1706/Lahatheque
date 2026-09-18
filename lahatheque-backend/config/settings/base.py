@@ -249,9 +249,14 @@ CORS_ALLOW_METHODS = ['DELETE', 'GET', 'OPTIONS', 'PATCH', 'POST', 'PUT']
 CORS_ALLOW_HEADERS = [
     'accept', 'accept-encoding', 'authorization', 'content-type',
     'dnt', 'origin', 'user-agent', 'x-csrftoken', 'x-requested-with',
-    'x-reader-token', 'baggage', 'sentry-trace'
+    'x-reader-token', 'x-reader-device-token', 'range', 'content-range',
+    'accept-ranges', 'baggage', 'sentry-trace'
 ]
-CORS_EXPOSE_HEADERS = ['Authorization', 'Content-Disposition', 'X-CSRFToken']
+CORS_EXPOSE_HEADERS = [
+    'Authorization', 'Content-Disposition', 'X-CSRFToken',
+    'Accept-Ranges', 'Content-Range', 'Content-Length',
+    'X-Sample-Pages', 'X-Sample-Total-Pages'
+]
 
 # LCP Server & External API Configurations
 LCP_SERVER_URL = config('LCP_SERVER_URL', default='http://localhost:8989')

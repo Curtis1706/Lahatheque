@@ -211,6 +211,17 @@ async function handleProxy(request: NextRequest, { params }: { params: Promise<{
         : [backendRes.headers.get('set-cookie')].filter(Boolean)
       binarySetCookies.forEach((c: string) => forwardHeaders.append('set-cookie', c))
 
+      // Pour les requetes partielles (Range HTTP 206) ou petits fragments (<= 2 Mo),
+      // bufferiser en ArrayBuffer garantit que Node.js / Next.js n'utilise pas Transfer-Encoding: chunked
+      // et preserve strictement Content-Length et Accept-Ranges indispensables pour PDF.js
+      if (backendRes.status === 206 || (contentLength && parseInt(contentLength, 10) <= 2 * 1024 * 1024)) {
+        const chunkBuffer = await backendRes.arrayBuffer()
+        return new Response(chunkBuffer, {
+          status: backendRes.status,
+          headers: forwardHeaders,
+        })
+      }
+
       return new Response(backendRes.body, {
         status: backendRes.status,
         headers: forwardHeaders,

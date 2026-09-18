@@ -33,6 +33,7 @@ export type WatermarkMode = "laha" | "partner";
 interface FlipBookProps {
   fileUrl: string | Uint8Array;
   bookId: string;
+  fileSize?: number;
   initialPage?: number;
   isMobile?: boolean;
   onPageChange?: (page: number) => void;
@@ -88,6 +89,9 @@ interface FlipBookProps {
   currentLanguage?: string;
   onLanguageChange?: (language: string) => void;
   httpHeaders?: Record<string, string>;
+  /** Template d'URL pour le chargement direct par page (Modèle Scribd / Internet Archive) */
+  pageUrlTemplate?: (pageNumber: number) => string;
+  totalPages?: number;
 }
 
 // ─── Page Component (display only) ───────────────────────────
@@ -246,6 +250,7 @@ Page.displayName = 'Page';
 export const FlipBookReader: React.FC<FlipBookProps> = ({
   fileUrl,
   bookId,
+  fileSize,
   initialPage = 0,
   isMobile = false,
   onPageChange,
@@ -288,6 +293,8 @@ export const FlipBookReader: React.FC<FlipBookProps> = ({
   currentLanguage,
   onLanguageChange,
   httpHeaders,
+  pageUrlTemplate,
+  totalPages: propTotalPages,
 }) => {
   const [numPages, setNumPages]     = useState<number>(0);
   const [pages, setPages]           = useState<string[]>([]);
@@ -401,8 +408,25 @@ export const FlipBookReader: React.FC<FlipBookProps> = ({
   const onDocumentLoadRef = useRef(onDocumentLoad);
   onDocumentLoadRef.current = onDocumentLoad;
 
-  // ── PDF loading (Only on mount or when bookId/fileUrl change) ──
+  // ── Mode Ultra-Rapide par Images Dérivées (Modèle Scribd / Internet Archive) ──
   useEffect(() => {
+    if (!pageUrlTemplate || !propTotalPages || propTotalPages <= 0) return;
+
+    setNumPages(propTotalPages);
+    onDocumentLoadRef.current?.(propTotalPages);
+
+    const initialWindow = getPageRenderWindow(initialPageRef.current, propTotalPages);
+    const initialPages = new Array(propTotalPages).fill('');
+    for (let i = initialWindow.start; i <= initialWindow.end; i++) {
+      initialPages[i] = pageUrlTemplate(i + 1);
+    }
+    setPages(initialPages);
+    setIsLoading(false);
+  }, [pageUrlTemplate, propTotalPages]);
+
+  // ── PDF loading (Fallback classique si pageUrlTemplate non fourni) ──
+  useEffect(() => {
+    if (pageUrlTemplate && propTotalPages && propTotalPages > 0) return;
     if (!fileUrl || (fileUrl instanceof Uint8Array && fileUrl.length === 0)) return;
     let isCancelled = false;
 
@@ -423,10 +447,11 @@ export const FlipBookReader: React.FC<FlipBookProps> = ({
             url: absoluteUrl,
             withCredentials: true,
             ...(httpHeaders ? { httpHeaders } : {}),
+            ...(fileSize && fileSize > 0 ? { length: fileSize } : {}),
             rangeChunkSize: 131072, // Streaming haute performance par fragments de 128 Ko
             disableAutoFetch: true, // Évite de précharger inutilement tout le document
-            disableStream: true,    // Active le vrai découpage par fragments HTTP 206 RFC 7233 sans télécharger tout le PDF
-            disableRange: false,    // Autorise expressément les requêtes Range partielles
+            disableStream: false,   // Permet le décodage et le rendu progressif immédiat dès les premiers fragments
+            disableRange: false,    // Autorise expressément les requêtes Range partielles HTTP 206
           };
         } else if (typeof fileUrl === 'object' && fileUrl !== null) {
           pdfSource = { data: fileUrl };
@@ -493,13 +518,30 @@ export const FlipBookReader: React.FC<FlipBookProps> = ({
     return () => {
       isCancelled = true;
     };
-  }, [fileUrl, bookId, hideQuiz, isSample, isMobile, renderPage, httpHeaders]);
+  }, [fileUrl, bookId, fileSize, hideQuiz, isSample, isMobile, renderPage, httpHeaders, pageUrlTemplate, propTotalPages]);
 
   // ── Lazy load nearby pages avec cache et traitement parallèle ──
   useEffect(() => {
-    if (!numPages || pages.length === 0 || !pdfInstance.current) return;
+    if (!numPages || pages.length === 0) return;
+    const { start, end } = getPageRenderWindow(currentPage, numPages);
+
+    if (pageUrlTemplate) {
+      let hasUpdates = false;
+      const nextPages = [...pages];
+      for (let i = start; i <= end; i++) {
+        if (!nextPages[i]) {
+          nextPages[i] = pageUrlTemplate(i + 1);
+          hasUpdates = true;
+        }
+      }
+      if (hasUpdates) {
+        setPages(nextPages);
+      }
+      return;
+    }
+
+    if (!pdfInstance.current) return;
     const load = async () => {
-      const { start, end } = getPageRenderWindow(currentPage, numPages);
       const toRender: number[] = [];
       for (let i = start; i <= end; i++) {
         if (!pages[i] && !renderingIndices.current.has(i)) {

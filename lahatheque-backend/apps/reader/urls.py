@@ -12,6 +12,7 @@ from .views import (
     QuizRetrieveOrGenerateView,
     QuizSubmitAnswersView,
     ReaderProtectedStreamView,
+    ReaderPageImageView,
 )
 
 app_name = "reader"
@@ -22,6 +23,9 @@ urlpatterns = [
 
     # Streaming protégé et filigrané du document d'une session (remplace file_url brut)
     path('sessions/stream/', ReaderProtectedStreamView.as_view(), name='session-stream'),
+
+    # Streaming ultra-rapide par page JPEG HD (Modèle Scribd / Internet Archive pour FlipBook)
+    path('sessions/page/', ReaderPageImageView.as_view(), name='session-page-image'),
     
     # Consultation et révocation de session
     path('sessions/<uuid:pk>/', ReaderSessionViewSet.as_view({
