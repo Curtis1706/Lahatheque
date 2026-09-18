@@ -244,7 +244,6 @@ export default function DocumentReaderPage() {
 
   const [book, setBook] = useState<any>(null)
   const [rawPdfData, setRawPdfData] = useState<string | null>(null)
-  const [isPdfLoading, setIsPdfLoading] = useState(false)
   const [pdfLoadError, setPdfLoadError] = useState<string | null>(null)
   const [isAccessDenied, setIsAccessDenied] = useState(false)
   const [drmSettings, setDrmSettings] = useState<any>(null)
@@ -264,10 +263,12 @@ export default function DocumentReaderPage() {
 
   const transformPdfGetDocumentParams = useCallback((options: any) => ({
     ...options,
-    disableStream: true,
+    withCredentials: true,
+    disableStream: false,
     disableAutoFetch: true,
-    rangeChunkSize: PDF_RANGE_CHUNK_SIZE,
-  }), [])
+    rangeChunkSize: 128 * 1024,
+    ...((book?.file_size || book?.file_size_bytes) ? { length: book.file_size || book.file_size_bytes } : {}),
+  }), [book?.file_size, book?.file_size_bytes])
 
   const setViewerRenderRange = useCallback((range: { startPage: number; numPages: number }) => {
     const maxStart = Math.max(range.numPages - 4, 0)
@@ -680,6 +681,10 @@ export default function DocumentReaderPage() {
         }
 
         setBook(data as any);
+        const initialTotalPages = (data as any).total_pages || (data as any).page_count || 0;
+        if (initialTotalPages > 0) {
+          setTotalPages(initialTotalPages);
+        }
         if (data && 'progress' in data && data.progress && !isSample) {
           setCurrentPage(data.progress.last_page || 0);
         }
@@ -940,10 +945,10 @@ export default function DocumentReaderPage() {
     );
   }
 
-  if (isLoading || isAuthLoading || !book || isPdfLoading || !bookLanguageResolved) {
+  if (isLoading || isAuthLoading || !book || !bookLanguageResolved) {
     return (
       <div className="h-screen bg-background flex flex-col items-center justify-center">
-        <PageLoader label={isPdfLoading ? 'Chargement sécurisé du document' : 'Préparation de votre salle de lecture'} />
+        <PageLoader label="Préparation de votre salle de lecture" />
       </div>
     )
   }
@@ -1010,15 +1015,16 @@ export default function DocumentReaderPage() {
           watermarkLahaSubtext={drmSettings?.watermark_laha_subtext}
         />
         <FlipBookReader
-          key={`${id}_${currentLanguage}_${currentPosition}_${safeDrmOpacity}_${drmSettings?.watermark_laha_template || ""}`}
+          key={`${id}_${currentLanguage}_${currentPosition}_${safeDrmOpacity}_${totalPages}_${drmSettings?.watermark_laha_template || ""}`}
           fileUrl={streamPdfUrl}
           bookId={id as string}
+          fileSize={book?.file_size || book?.file_size_bytes || undefined}
           initialPage={isSampleMode ? 0 : currentPage}
           isMobile={isMobile}
           isSample={isSampleMode}
           hideQuiz={isSampleMode}
-          pageUrlTemplate={!isSampleMode ? (page: number) => `/api/bff/catalog/books/${id}/page/?page=${page}&lang=${currentLanguage}` : undefined}
-          totalPages={(totalPages > 0 ? totalPages : book?.page_count) || undefined}
+          pageUrlTemplate={!isSampleMode ? (page: number) => `/api/bff/catalog/books/${id}/page/?page=${page}&lang=${encodeURIComponent(currentLanguage)}` : undefined}
+          totalPages={(totalPages > 0 ? totalPages : (book?.total_pages || book?.page_count)) || undefined}
           onDocumentLoad={(num) => {
             setTotalPages(num);
             syncProgress(currentPage, num);
