@@ -152,8 +152,12 @@ class BookStreamView(APIView):
 
         safe_title = (doc_title or "document")[:50].replace('"', '')
 
-        # 5. Délégation Nginx X-Accel-Redirect si activé en production
-        if getattr(settings, 'USE_X_ACCEL_REDIRECT', False):
+        # 5. Délégation Nginx X-Accel-Redirect uniquement si explicitement configuré et supporté par le reverse proxy
+        # Sous Coolify/Traefik sans module Nginx interne, le flux Range RFC 7233 par tranches de 128 Ko
+        # est servi directement pour éviter tout envoi de corps vide (0 octet) causant un gel de 5 min.
+        x_accel_enabled = getattr(settings, 'USE_X_ACCEL_REDIRECT', False)
+        has_nginx_accel = bool(request.META.get('HTTP_X_ACCEL_SUPPORT') or request.headers.get('x-accel-support'))
+        if x_accel_enabled and has_nginx_accel:
             response = HttpResponse(content_type="application/pdf")
             response["X-Accel-Redirect"] = f"/protected_derived/{cache_key}.pdf"
             response["Content-Disposition"] = f'inline; filename="{safe_title}.pdf"'

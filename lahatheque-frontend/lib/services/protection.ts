@@ -149,16 +149,35 @@ export async function getAccessTraces(): Promise<TraceRecord[]> {
       if (Array.isArray(rawList)) {
         for (const item of rawList) {
           const tId = String(item.id);
-          // Éviter les doublons
-          if (traces.some((t) => t.id === tId)) continue;
+          // Éviter les doublons avec les sessions partenaires déjà enregistrées
+          const isDuplicate = traces.some((t) => {
+            if (t.id === tId) return true;
+            const itemBookTitle = item.book_title || item.document_title;
+            const sameBook =
+              (t.book_title && itemBookTitle && t.book_title.toLowerCase() === itemBookTitle.toLowerCase()) ||
+              (t.book_id && item.book_id && t.book_id === String(item.book_id));
+            const sameIp = t.ip_address === item.ip_address;
+            const timeDiff = Math.abs(
+              new Date(t.timestamp).getTime() - new Date(item.timestamp || item.created_at).getTime()
+            );
+            return sameBook && sameIp && timeDiff < 300000;
+          });
+          if (isDuplicate) continue;
+
+          const bId = String(item.book_id || item.ouvrage || "");
+          const coverUrl =
+            item.cover_url ||
+            item.cover_image ||
+            (bId && !bId.startsWith("byod") ? `/api/bff/catalog/books/${bId}/cover/` : "");
 
           traces.push({
             id: tId,
-            user_email: item.user_email || "lecteur@lahatheque.com",
+            user_email: item.user_email || "lecteur@institution.bj",
             user_name: item.user_name || "Lecteur Authentifié",
             partner_name: item.partner_name || "Accès Direct",
             book_title: item.book_title || item.document_title || "Ouvrage LAHA",
-            book_id: String(item.book_id || item.ouvrage || ""),
+            book_id: bId,
+            cover_url: coverUrl,
             access_type: item.access_type || "read_chunk",
             ip_address: item.ip_address || "127.0.0.1",
             country: item.country || "BJ",
@@ -166,7 +185,7 @@ export async function getAccessTraces(): Promise<TraceRecord[]> {
             current_page: item.current_page || item.page_number || 1,
             total_pages: item.total_pages || 1,
             progress_percent: item.progress_percent || 0,
-            reading_time_minutes: item.reading_time_minutes || 0,
+            reading_time_minutes: item.reading_time_minutes || 1,
             page_number: item.current_page || item.page_number || 1,
             timestamp: item.timestamp || item.created_at || new Date().toISOString(),
           });

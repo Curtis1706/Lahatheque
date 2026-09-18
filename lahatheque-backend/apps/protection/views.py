@@ -170,11 +170,15 @@ class TraceAccesViewSet(ReadOnlyModelViewSet):
                 duration_minutes = int(s.reading_time_seconds / 60) if s.reading_time_seconds else 0
 
                 cover_url = ""
-                if s.ouvrage and hasattr(s.ouvrage, "cover_image") and s.ouvrage.cover_image:
-                    try:
-                        cover_url = s.ouvrage.cover_image.url
-                    except Exception:
-                        cover_url = ""
+                if s.ouvrage:
+                    cover_url = getattr(s.ouvrage, "cover_url", "") or ""
+                    if not cover_url and getattr(s.ouvrage, "cover_image", None):
+                        try:
+                            cover_url = s.ouvrage.cover_image.url
+                        except Exception:
+                            cover_url = ""
+                if not cover_url and s.ouvrage_id:
+                    cover_url = f"/api/bff/catalog/books/{s.ouvrage_id}/cover/"
 
                 results.append({
                     "id": str(s.id),
@@ -234,11 +238,15 @@ class TraceAccesViewSet(ReadOnlyModelViewSet):
 
             # Couverture réelle de l'ouvrage
             cover_url = ""
-            if t.ouvrage and hasattr(t.ouvrage, "cover_image") and t.ouvrage.cover_image:
-                try:
-                    cover_url = t.ouvrage.cover_image.url
-                except Exception:
-                    cover_url = ""
+            if t.ouvrage:
+                cover_url = getattr(t.ouvrage, "cover_url", "") or ""
+                if not cover_url and getattr(t.ouvrage, "cover_image", None):
+                    try:
+                        cover_url = t.ouvrage.cover_image.url
+                    except Exception:
+                        cover_url = ""
+            if not cover_url and t.ouvrage_id:
+                cover_url = f"/api/bff/catalog/books/{t.ouvrage_id}/cover/"
 
             # Nombre total de pages réel
             total_pages = 1
@@ -314,11 +322,15 @@ class TraceAccesViewSet(ReadOnlyModelViewSet):
                 b_title = rp.ouvrage.title
 
                 cover_url = ""
-                if hasattr(rp.ouvrage, "cover_image") and rp.ouvrage.cover_image:
-                    try:
-                        cover_url = rp.ouvrage.cover_image.url
-                    except Exception:
-                        cover_url = ""
+                if rp.ouvrage:
+                    cover_url = getattr(rp.ouvrage, "cover_url", "") or ""
+                    if not cover_url and getattr(rp.ouvrage, "cover_image", None):
+                        try:
+                            cover_url = rp.ouvrage.cover_image.url
+                        except Exception:
+                            cover_url = ""
+                if not cover_url and rp.ouvrage_id:
+                    cover_url = f"/api/bff/catalog/books/{rp.ouvrage_id}/cover/"
 
                 tot_p = rp.total_pages or getattr(rp.ouvrage, "page_count", None) or getattr(rp.ouvrage, "pages", 1) or 1
                 cur_p = rp.current_page or 1

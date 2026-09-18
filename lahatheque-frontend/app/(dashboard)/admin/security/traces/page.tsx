@@ -392,23 +392,28 @@ export default function AdminTracesAccesPage() {
                       <td className="py-5 px-5 align-middle">
                         <div className="flex items-center gap-3.5">
                           {/* Miniature de couverture de l'ouvrage */}
-                          <div className="relative w-10 h-14 shrink-0 rounded-lg overflow-hidden bg-navy/10 border border-border/80 shadow-xs flex items-center justify-center">
-                            {trace.cover_url ? (
-                              <img
-                                src={trace.cover_url}
-                                alt={trace.book_title}
-                                className="w-full h-full object-cover"
-                                onError={(e) => {
-                                  e.currentTarget.style.display = "none";
-                                  const fallback = e.currentTarget.parentElement?.querySelector(".fallback-cover");
-                                  if (fallback) fallback.classList.remove("hidden");
-                                }}
-                              />
-                            ) : null}
-                            <div className={`fallback-cover ${trace.cover_url ? "hidden" : "flex"} w-full h-full items-center justify-center bg-navy/90 text-gold`}>
-                              <BookOpen className="w-4 h-4" />
-                            </div>
-                          </div>
+                          {(() => {
+                            const coverUrl = trace.cover_url || (trace.book_id && !trace.book_id.startsWith("byod") ? `/api/bff/catalog/books/${trace.book_id}/cover/` : "");
+                            return (
+                              <div className="relative w-10 h-14 shrink-0 rounded-lg overflow-hidden bg-navy/10 border border-border/80 shadow-xs flex items-center justify-center">
+                                {coverUrl ? (
+                                  <img
+                                    src={coverUrl}
+                                    alt={trace.book_title}
+                                    className="w-full h-full object-cover"
+                                    onError={(e) => {
+                                      e.currentTarget.style.display = "none";
+                                      const fallback = e.currentTarget.parentElement?.querySelector(".fallback-cover");
+                                      if (fallback) fallback.classList.remove("hidden");
+                                    }}
+                                  />
+                                ) : null}
+                                <div className={`fallback-cover ${coverUrl ? "hidden" : "flex"} w-full h-full items-center justify-center bg-navy/90 text-gold`}>
+                                  <BookOpen className="w-4 h-4" />
+                                </div>
+                              </div>
+                            );
+                          })()}
 
                           {/* Titre et Badges */}
                           <div className="min-w-0 max-w-[280px] lg:max-w-[340px] space-y-1">
@@ -501,23 +506,28 @@ export default function AdminTracesAccesPage() {
                   {/* Carte Document avec Couverture sur Mobile */}
                   <div className="p-3 rounded-xl bg-background border border-border text-xs space-y-2.5">
                     <div className="flex items-center gap-3">
-                      <div className="relative w-9 h-12 shrink-0 rounded-lg overflow-hidden bg-navy/10 border border-border shadow-xs flex items-center justify-center">
-                        {trace.cover_url ? (
-                          <img
-                            src={trace.cover_url}
-                            alt={trace.book_title}
-                            className="w-full h-full object-cover"
-                            onError={(e) => {
-                              e.currentTarget.style.display = "none";
-                              const fallback = e.currentTarget.parentElement?.querySelector(".fallback-cover-mobile");
-                              if (fallback) fallback.classList.remove("hidden");
-                            }}
-                          />
-                        ) : null}
-                        <div className={`fallback-cover-mobile ${trace.cover_url ? "hidden" : "flex"} w-full h-full items-center justify-center bg-navy/90 text-gold`}>
-                          <BookOpen className="w-3.5 h-3.5" />
-                        </div>
-                      </div>
+                      {(() => {
+                        const coverUrl = trace.cover_url || (trace.book_id && !trace.book_id.startsWith("byod") ? `/api/bff/catalog/books/${trace.book_id}/cover/` : "");
+                        return (
+                          <div className="relative w-9 h-12 shrink-0 rounded-lg overflow-hidden bg-navy/10 border border-border shadow-xs flex items-center justify-center">
+                            {coverUrl ? (
+                              <img
+                                src={coverUrl}
+                                alt={trace.book_title}
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  e.currentTarget.style.display = "none";
+                                  const fallback = e.currentTarget.parentElement?.querySelector(".fallback-cover-mobile");
+                                  if (fallback) fallback.classList.remove("hidden");
+                                }}
+                              />
+                            ) : null}
+                            <div className={`fallback-cover-mobile ${coverUrl ? "hidden" : "flex"} w-full h-full items-center justify-center bg-navy/90 text-gold`}>
+                              <BookOpen className="w-3.5 h-3.5" />
+                            </div>
+                          </div>
+                        );
+                      })()}
 
                       <div className="min-w-0 flex-1">
                         <p className="font-semibold text-foreground truncate text-xs">{trace.book_title}</p>
