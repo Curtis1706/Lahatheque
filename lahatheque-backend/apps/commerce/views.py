@@ -2,6 +2,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework import status
+from rest_framework.renderers import BaseRenderer
 from apps.accounts.permissions import IsAdminOrSuperAdmin, IsManagerOrAdmin
 from django.db import transaction
 from decimal import Decimal
@@ -637,12 +638,25 @@ class OrderDetailView(APIView):
             return Response({'error': 'Commande introuvable'}, status=status.HTTP_404_NOT_FOUND)
 
 
+class PdfInvoiceRenderer(BaseRenderer):
+    media_type = "*/*"
+    format = ""
+
+    def render(self, data, accepted_media_type=None, renderer_context=None):
+        return data
+
+
 class OrderInvoiceDownloadView(APIView):
     """
     Sert la facture officielle PDF acquittée générée par PyMuPDF (identique à l'email).
     Accessible au client propriétaire, après achat ou aux rôles de gestion/administration.
     """
     permission_classes = [AllowAny]
+    renderer_classes = [PdfInvoiceRenderer]
+
+    def perform_content_negotiation(self, request, force=False):
+        renderers = self.get_renderers()
+        return renderers[0], renderers[0].media_type
 
     def get(self, request, order_id):
         user = request.user

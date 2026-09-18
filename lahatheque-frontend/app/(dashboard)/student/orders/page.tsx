@@ -239,7 +239,7 @@ function StudentOrdersContent() {
       const res = await fetch(`/api/bff/commerce/orders/${order.id}/invoice/`, {
         method: "GET",
         credentials: "include",
-        headers: { Accept: "application/pdf" },
+        headers: { Accept: "application/pdf, */*" },
       });
 
       if (res.ok) {

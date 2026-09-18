@@ -50,7 +50,7 @@ export default function CheckoutPage() {
       const res = await fetch(`/api/bff/commerce/orders/${orderId}/invoice/`, {
         method: "GET",
         credentials: "include",
-        headers: { Accept: "application/pdf" },
+        headers: { Accept: "application/pdf, */*" },
       });
 
       if (res.ok) {
