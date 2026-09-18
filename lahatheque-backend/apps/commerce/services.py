@@ -243,11 +243,69 @@ def notify_admin_order_event(commande, event_type: str = "order_created", extra_
         logger.error(f"[Commerce] Erreur notification admin pour commande {commande.id}: {notify_err}", exc_info=True)
 
 
+def build_order_invoice_data(commande, payment_method_label=None) -> dict:
+    """Construit le dictionnaire de données complet pour la génération de facture officielle PDF."""
+    from apps.commerce.models import LigneCommande
+    from django.utils import timezone
+
+    lignes = LigneCommande.objects.filter(commande=commande).select_related('ouvrage')
+    items_list = []
+    has_physical = False
+    for l in lignes:
+        if l.format_type in ('paper', 'papier'):
+            has_physical = True
+        items_list.append({
+            "title": l.ouvrage.title if l.ouvrage else "Ouvrage LAHAThèque",
+            "quantity": l.quantity,
+            "unit_price": float(l.unit_price or 0.0),
+            "total": float(getattr(l, 'total_price', None) or (l.quantity * (l.unit_price or 0))),
+        })
+
+    order_num = str(getattr(commande, 'numero_commande', '') or str(commande.id)[:8])
+    full_name = f"{commande.user.first_name or ''} {commande.user.last_name or ''}".strip() or str(commande.user.email)
+    total_amt = float(getattr(commande, 'total_ttc', 0.0) or getattr(commande, 'total_amount', 0.0) or 0.0)
+
+    curr_code = getattr(commande.currency, 'code', None) or str(getattr(commande, 'currency', 'FCFA') or 'FCFA')
+    if curr_code == "XOF":
+        curr_code = "FCFA"
+
+    payment_method = payment_method_label
+    if not payment_method:
+        mode_val = getattr(commande, 'mode_paiement', 'mobile_money')
+        mode_map = {
+            "mobile_money": "Mobile Money",
+            "credit_card": "Carte Bancaire",
+            "bank_transfer": "Virement Bancaire",
+            "cash": "Espèces à la livraison",
+            "credit": "Achat à Crédit (Auteur)",
+        }
+        payment_method = mode_map.get(mode_val, str(mode_val).title())
+
+    customer_address = "Cotonou, Bénin"
+    if hasattr(commande, 'livraison') and commande.livraison:
+        customer_address = f"{commande.livraison.shipping_address}, {commande.livraison.city}"
+    elif hasattr(commande, 'shipping_address') and commande.shipping_address:
+        customer_address = commande.shipping_address
+
+    return {
+        "order_number": order_num,
+        "customer_name": full_name,
+        "customer_email": str(commande.user.email),
+        "customer_address": customer_address,
+        "date": commande.created_at.strftime("%d/%m/%Y") if hasattr(commande, 'created_at') and commande.created_at else timezone.now().strftime("%d/%m/%Y"),
+        "items": items_list,
+        "total_amount": total_amt,
+        "currency": curr_code,
+        "payment_method": payment_method,
+        "is_paid": (commande.statut_paiement == 'paid'),
+        "has_physical": has_physical,
+    }
+
+
 def _notify_order_finalized(commande, context_label):
     from apps.reporting.services import notify_user
     from apps.reporting.models import Notification
     from apps.communications.services.email_service import send_transactional_email
-    from .models import LigneCommande
     from django.conf import settings
 
     # 1. Notification in-app interne (mentionne la validité 12 mois pour le numérique)
@@ -269,39 +327,12 @@ def _notify_order_finalized(commande, context_label):
     # 2. Envoi d'email transactionnel officiel avec Facture PDF jointe (Client)
     try:
         if commande.user and commande.user.email:
-            lignes = LigneCommande.objects.filter(commande=commande).select_related('ouvrage')
-            items_list = []
-            has_physical = False
-            for l in lignes:
-                if l.format_type in ('paper', 'papier'):
-                    has_physical = True
-                items_list.append({
-                    "title": l.ouvrage.title if l.ouvrage else "Ouvrage LAHAThèque",
-                    "quantity": l.quantity,
-                    "unit_price": float(l.unit_price or 0.0),
-                    "total": float(getattr(l, 'total_price', None) or (l.quantity * (l.unit_price or 0))),
-                })
-
-            order_num = str(getattr(commande, 'numero_commande', '') or str(commande.id)[:8])
-            full_name = f"{commande.user.first_name or ''} {commande.user.last_name or ''}".strip() or str(commande.user.email)
-            total_amt = float(getattr(commande, 'total_ttc', 0.0) or getattr(commande, 'total_amount', 0.0) or 0.0)
-
-            curr_code = getattr(commande.currency, 'code', None) or str(getattr(commande, 'currency', 'FCFA') or 'FCFA')
-            if curr_code == "XOF":
-                curr_code = "FCFA"
-
-            pdf_invoice_data = {
-                "order_number": order_num,
-                "customer_name": full_name,
-                "customer_email": str(commande.user.email),
-                "customer_address": getattr(commande, 'shipping_address', 'Cotonou, Bénin') or 'Cotonou, Bénin',
-                "date": commande.created_at.strftime("%d/%m/%Y") if hasattr(commande, 'created_at') and commande.created_at else timezone.now().strftime("%d/%m/%Y"),
-                "items": items_list,
-                "total_amount": total_amt,
-                "currency": curr_code,
-                "payment_method": context_label,
-                "is_paid": (commande.statut_paiement == 'paid'),
-            }
+            pdf_invoice_data = build_order_invoice_data(commande, payment_method_label=context_label)
+            order_num = pdf_invoice_data["order_number"]
+            full_name = pdf_invoice_data["customer_name"]
+            total_amt = pdf_invoice_data["total_amount"]
+            items_list = pdf_invoice_data["items"]
+            has_physical = pdf_invoice_data["has_physical"]
 
             send_transactional_email(
                 email_type="order_confirmation_client",

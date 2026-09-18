@@ -19,13 +19,13 @@ export interface CompanyLegalInfo {
 }
 
 export const LAHA_LEGAL_INFO: CompanyLegalInfo = {
-  name: "LAHAThèque Éditions & Numérique S.A.",
+  name: "LAHA Éditions S.A.",
   ifu: "3202011691197",
   rccm: "RB/COT/24 B 12458",
-  address: "Immeuble LAHA Éditions, Boulevard de la Marina, Cotonou, République du Bénin",
+  address: "MAISON ABD'EL HAKIM LALEYE, Agla, 13ème arr., Cotonou, Bénin",
   phone: "(+229) 21 30 45 80 / (+229) 97 00 11 22",
-  email: "contact@lahatheque.bj",
-  website: "https://lahatheque.bj",
+  email: "lahaeditions1@gmail.com",
+  website: "https://www.lahatheque.com",
 };
 
 export interface PdfDocumentOptions {
@@ -178,7 +178,7 @@ export async function generateOfficialPdf(rawOptions: PdfDocumentOptions): Promi
   doc.setFont("helvetica", "bold");
   doc.setFontSize(7);
   doc.setTextColor(...goldRgb);
-  doc.text("ÉDITIONS & BIBLIOTHÈQUE NUMÉRIQUE UNIVERSITAIRE", textStartX, y + 4.5);
+  doc.text("ÉDITIONS & BIBLIOTHÈQUE NUMÉRIQUE", textStartX, y + 4.5);
 
   // Coordonnées légales à droite
   doc.setFont("helvetica", "normal");

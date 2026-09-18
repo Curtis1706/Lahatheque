@@ -232,12 +232,39 @@ function StudentOrdersContent() {
 
   const handleDownloadInvoice = async (order: OrderAPI, e: React.MouseEvent) => {
     e.stopPropagation();
+    const orderRef = `#${String(order.id).slice(0, 8).toUpperCase()}`;
+    const filename = `facture_LAHA_${orderRef.replace("#", "")}.pdf`;
+
+    // 1. Téléchargement direct de la facture officielle certifiée générée par le backend (identique à l'email)
     try {
-      const orderRef = `#${String(order.id).slice(0, 8).toUpperCase()}`;
+      const res = await fetch(`/api/bff/commerce/orders/${order.id}/invoice/`, {
+        method: "GET",
+        headers: { Accept: "application/pdf" },
+      });
+
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+        toast.success(`Facture officielle ${orderRef} téléchargée avec succès !`);
+        return;
+      }
+    } catch (apiErr) {
+      console.warn("[OrdersPage] Re-tentative via générateur local:", apiErr);
+    }
+
+    // 2. Générateur de secours local (fallback) avec coordonnées officielles synchronisées
+    try {
       const customerName = user
         ? [user.first_name, user.last_name].filter(Boolean).join(" ") || "Client / Apprenant LAHAThèque"
         : "Client / Apprenant LAHAThèque";
-      const customerEmail = user?.email || (order.livraison?.carrier_name ? `Transporteur : ${order.livraison.carrier_name}` : "contact@lahatheque.bj");
+      const customerEmail = user?.email || (order.livraison?.carrier_name ? `Transporteur : ${order.livraison.carrier_name}` : "contact@lahatheque.com");
 
       await generateOfficialPdf({
         docType: "FACTURE",
@@ -266,7 +293,7 @@ function StudentOrdersContent() {
         totalAmount: formatPrice(order.total_amount),
         totalLabel: order.statut_paiement === "paid" ? "TOTAL PAYÉ :" : "TOTAL NET À PAYER :",
         totalNotes: `Facture acquittée (${order.statut_paiement_display || "Payé"}). Conforme à la législation fiscale UEMOA en vigueur.`,
-        filename: `facture_LAHA_${orderRef.replace("#", "")}.pdf`,
+        filename: filename,
       });
       toast.success(`Facture ${orderRef} générée et téléchargée au format PDF officiel !`);
     } catch {

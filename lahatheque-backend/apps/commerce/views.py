@@ -636,6 +636,40 @@ class OrderDetailView(APIView):
         except Order.DoesNotExist:
             return Response({'error': 'Commande introuvable'}, status=status.HTTP_404_NOT_FOUND)
 
+
+class OrderInvoiceDownloadView(APIView):
+    """
+    Sert la facture officielle PDF acquittée générée par PyMuPDF (identique à l'email).
+    Accessible au client propriétaire ou aux rôles de gestion/administration.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, order_id):
+        user = request.user
+        if getattr(user, 'role', '') in ['admin', 'superadmin', 'manager', 'accountant'] or user.is_staff:
+            commande = Order.objects.filter(id=order_id).first()
+        else:
+            commande = Order.objects.filter(id=order_id, user=user).first()
+
+        if not commande:
+            return Response({'error': 'Commande introuvable'}, status=status.HTTP_404_NOT_FOUND)
+
+        from apps.communications.services.pdf_attachment_service import PdfAttachmentService
+        from apps.commerce.services import build_order_invoice_data
+        from django.http import HttpResponse
+
+        invoice_data = build_order_invoice_data(commande)
+        pdf_bytes = PdfAttachmentService.generate_invoice_pdf(invoice_data)
+
+        order_ref = invoice_data.get("order_number") or str(commande.id)[:8]
+        filename = f"facture_LAHA_{order_ref}.pdf"
+
+        response = HttpResponse(pdf_bytes, content_type="application/pdf")
+        response["Content-Disposition"] = f'attachment; filename="{filename}"'
+        response["Content-Length"] = str(len(pdf_bytes))
+        response["Access-Control-Expose-Headers"] = "Content-Disposition, Content-Length"
+        return response
+
 class SubscriptionPlanListView(APIView):
     permission_classes = [IsAuthenticated]
 
