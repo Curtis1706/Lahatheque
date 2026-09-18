@@ -16,15 +16,17 @@ import { ReaderLanguageSelector } from '@/components/features/reader/reader-lang
 // Types
 import { Annotation } from './flipbook/types';
 
-const PAGE_RENDER_WINDOW = 12;
-const MAX_CACHED_PAGES = 50;
-
-const getPageRenderWindow = (pageIndex: number, totalPages: number) => {
-  const maxStart = Math.max(totalPages - PAGE_RENDER_WINDOW, 0);
-  const start = Math.max(0, Math.min(pageIndex - 1, maxStart));
-  const end = Math.min(totalPages - 1, start + PAGE_RENDER_WINDOW - 1);
-  return { start, end };
-};
+/**
+ * Paramètres du Buffer Glissant Prioritaire (Lookahead Chunking & Memory Eviction)
+ * - LOOKAHEAD_CHUNK_SIZE: taille du paquet de préchargement en tâche de fond (4 pages)
+ * - LOOKAHEAD_THRESHOLD: distance déclencheuse du paquet suivant (2 pages avant la fin du paquet actuel)
+ * - MAX_BACKWARD_RETAIN: conservation arrière maximale (6 pages) avant libération mémoire RAM/GPU
+ * - MAX_CACHED_PAGES: plafond de sécurité absolu du cache LRU mémoire
+ */
+const LOOKAHEAD_CHUNK_SIZE = 4;
+const LOOKAHEAD_THRESHOLD = 2;
+const MAX_BACKWARD_RETAIN = 6;
+const MAX_CACHED_PAGES = 24;
 
 /** Mode "laha" : filigrane institutionnel doré discret.
  * Mode "partner" : filigrane nominatif légal (nom, email, IP). */
@@ -247,9 +249,10 @@ Page.displayName = 'Page';
 interface FlipBookPageImageProps {
   src: string;
   pageNumber: number;
+  onLoaded?: () => void;
 }
 
-const FlipBookPageImage: React.FC<FlipBookPageImageProps> = ({ src, pageNumber }) => {
+const FlipBookPageImage: React.FC<FlipBookPageImageProps> = ({ src, pageNumber, onLoaded }) => {
   const [hasError, setHasError] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
 
@@ -278,8 +281,9 @@ const FlipBookPageImage: React.FC<FlipBookPageImageProps> = ({ src, pageNumber }
       src={effectiveSrc}
       alt={`Page ${pageNumber}`}
       className="w-full h-full object-cover"
-      loading="lazy"
+      loading="eager"
       draggable={false}
+      onLoad={onLoaded}
       onError={() => {
         if (retryCount < 2) {
           setTimeout(() => {
@@ -457,21 +461,49 @@ export const FlipBookReader: React.FC<FlipBookProps> = ({
   const onDocumentLoadRef = useRef(onDocumentLoad);
   onDocumentLoadRef.current = onDocumentLoad;
 
-  // ── Mode Ultra-Rapide par Images Dérivées (Modèle Scribd / Internet Archive) ──
+  // ── Mode Ultra-Rapide par Images Dérivées (Buffer Glissant Prioritaire) ──
   useEffect(() => {
     if (!pageUrlTemplate || !propTotalPages || propTotalPages <= 0) return;
 
     setNumPages(propTotalPages);
     onDocumentLoadRef.current?.(propTotalPages);
 
-    const initialWindow = getPageRenderWindow(initialPageRef.current, propTotalPages);
+    const initialIdx = initialPageRef.current;
     const initialPages = new Array(propTotalPages).fill('');
-    for (let i = initialWindow.start; i <= initialWindow.end; i++) {
-      initialPages[i] = pageUrlTemplate(i + 1);
+
+    // Phase 1 : Priorité absolue aux 2 premières pages visibles (1 seule sur mobile)
+    const initialIndices = [initialIdx];
+    if (!effectiveIsMobile && initialIdx + 1 < propTotalPages) {
+      initialIndices.push(initialIdx + 1);
     }
+
+    initialIndices.forEach((idx) => {
+      if (idx >= 0 && idx < propTotalPages) {
+        initialPages[idx] = pageUrlTemplate(idx + 1);
+      }
+    });
+
     setPages(initialPages);
     setIsLoading(false);
-  }, [pageUrlTemplate, propTotalPages]);
+
+    // Phase 2 : Déclenchement échelonné du 1er paquet suivant (4 pages en tâche de fond)
+    const timer = setTimeout(() => {
+      const nextForwardLimit = Math.min(propTotalPages - 1, initialIdx + initialIndices.length + LOOKAHEAD_CHUNK_SIZE - 1);
+      setPages((prev) => {
+        const next = [...prev];
+        let hasUpdates = false;
+        for (let i = initialIdx; i <= nextForwardLimit; i++) {
+          if (!next[i]) {
+            next[i] = pageUrlTemplate(i + 1);
+            hasUpdates = true;
+          }
+        }
+        return hasUpdates ? next : prev;
+      });
+    }, 120);
+
+    return () => clearTimeout(timer);
+  }, [pageUrlTemplate, propTotalPages, effectiveIsMobile]);
 
   // ── PDF loading (Fallback classique si pageUrlTemplate non fourni) ──
   useEffect(() => {
@@ -521,12 +553,11 @@ export const FlipBookReader: React.FC<FlipBookProps> = ({
         // Déverrouillage immédiat de la vue : la liseuse 3D s'affiche sans bloquer
         setIsLoading(false);
 
-        const initialWindow = getPageRenderWindow(initialPageRef.current, total);
-        
+        const initialIdx = initialPageRef.current;
         // Rendu parallèle immédiat des pages de la double-page visible de départ
-        const initialIndices = [initialWindow.start];
-        if (!isMobile && initialWindow.start + 1 <= initialWindow.end) {
-          initialIndices.push(initialWindow.start + 1);
+        const initialIndices = [initialIdx];
+        if (!effectiveIsMobile && initialIdx + 1 < total) {
+          initialIndices.push(initialIdx + 1);
         }
 
         const initialUrls = await Promise.all(initialIndices.map(i => renderPage(pdf, i)));
@@ -540,13 +571,14 @@ export const FlipBookReader: React.FC<FlipBookProps> = ({
           return next;
         });
 
-        // Préchargement asynchrone non-bloquant des pages adjacentes
-        const remainingIndices: number[] = [];
-        for (let i = initialWindow.start + initialIndices.length; i <= initialWindow.end; i++) {
-          remainingIndices.push(i);
+        // Préchargement échelonné du 1er paquet suivant en tâche de fond
+        const nextLimit = Math.min(total - 1, initialIdx + initialIndices.length + LOOKAHEAD_CHUNK_SIZE - 1);
+        const lookaheadIndices: number[] = [];
+        for (let i = initialIdx + initialIndices.length; i <= nextLimit; i++) {
+          lookaheadIndices.push(i);
         }
-        if (remainingIndices.length > 0) {
-          Promise.all(remainingIndices.map(async i => {
+        if (lookaheadIndices.length > 0) {
+          Promise.all(lookaheadIndices.map(async i => {
             if (isCancelled) return;
             const url = await renderPage(pdf, i);
             setPages(prev => {
@@ -567,32 +599,74 @@ export const FlipBookReader: React.FC<FlipBookProps> = ({
     return () => {
       isCancelled = true;
     };
-  }, [fileUrl, bookId, fileSize, hideQuiz, isSample, isMobile, renderPage, httpHeaders, pageUrlTemplate, propTotalPages]);
+  }, [fileUrl, bookId, fileSize, hideQuiz, isSample, effectiveIsMobile, renderPage, httpHeaders, pageUrlTemplate, propTotalPages]);
 
-  // ── Lazy load nearby pages avec cache et traitement parallèle ──
+  // ── Gestion dynamique du buffer glissant et libération mémoire au fil de la lecture ──
   useEffect(() => {
     if (!numPages || pages.length === 0) return;
-    const { start, end } = getPageRenderWindow(currentPage, numPages);
 
+    // A. Mode Template d'images (Modèle Scribd / Internet Archive)
     if (pageUrlTemplate) {
+      let forwardLoadedIndex = currentPage;
+      for (let i = currentPage; i < numPages; i++) {
+        if (pages[i]) {
+          forwardLoadedIndex = i;
+        } else {
+          break;
+        }
+      }
+
+      // Seuil déclencheur : dès qu'on arrive à 2 pages de la fin du buffer actuel, charger les 4 suivantes
+      const needsForwardPreload = (forwardLoadedIndex - currentPage) <= LOOKAHEAD_THRESHOLD;
+      const targetForward = Math.min(numPages - 1, forwardLoadedIndex + LOOKAHEAD_CHUNK_SIZE);
+      const targetBackward = Math.max(0, currentPage - 2);
+
       let hasUpdates = false;
       const nextPages = [...pages];
-      for (let i = start; i <= end; i++) {
+
+      // 1. Préchargement du paquet suivant (4 pages d'avance)
+      if (needsForwardPreload) {
+        for (let i = forwardLoadedIndex + 1; i <= targetForward; i++) {
+          if (!nextPages[i]) {
+            nextPages[i] = pageUrlTemplate(i + 1);
+            hasUpdates = true;
+          }
+        }
+      }
+
+      // 2. Garantir les 2 pages précédentes pour un retour arrière instantané
+      for (let i = targetBackward; i < currentPage; i++) {
         if (!nextPages[i]) {
           nextPages[i] = pageUrlTemplate(i + 1);
           hasUpdates = true;
         }
       }
+
+      // 3. Libération progressive de la mémoire (Garbage Collection des pages > 6 pages en arrière)
+      const evictThreshold = currentPage - MAX_BACKWARD_RETAIN;
+      if (evictThreshold > 0) {
+        for (let i = 0; i < evictThreshold; i++) {
+          if (nextPages[i]) {
+            nextPages[i] = '';
+            hasUpdates = true;
+          }
+        }
+      }
+
       if (hasUpdates) {
         setPages(nextPages);
       }
       return;
     }
 
+    // B. Mode Fallback PDF (pdf.js)
     if (!pdfInstance.current) return;
     const load = async () => {
+      const targetForward = Math.min(numPages - 1, currentPage + (effectiveIsMobile ? 1 : 2) + LOOKAHEAD_CHUNK_SIZE);
+      const targetBackward = Math.max(0, currentPage - 2);
+
       const toRender: number[] = [];
-      for (let i = start; i <= end; i++) {
+      for (let i = targetBackward; i <= targetForward; i++) {
         if (!pages[i] && !renderingIndices.current.has(i)) {
           toRender.push(i);
         }
@@ -617,16 +691,17 @@ export const FlipBookReader: React.FC<FlipBookProps> = ({
       }));
     };
     load();
-  }, [currentPage, numPages, pages, bookId, renderPage]);
+  }, [currentPage, numPages, pages, pageUrlTemplate, effectiveIsMobile, renderPage]);
 
-  // ── Nettoyage LRU strict de la mémoire vive (plafond < 30 Mo de RAM) ──
+  // ── Nettoyage LRU strict de la mémoire vive (plafond < 24 Mo de RAM) ──
   useEffect(() => {
     if (!pageCache.current || pageCache.current.size <= MAX_CACHED_PAGES) return;
-    const evictRadius = Math.floor(MAX_CACHED_PAGES / 2);
+    const evictBeforeIndex = currentPage - MAX_BACKWARD_RETAIN;
+    const evictAfterIndex = currentPage + LOOKAHEAD_CHUNK_SIZE + 4;
     const keysToEvict: number[] = [];
 
     pageCache.current.forEach((url, pageIdx) => {
-      if (Math.abs(pageIdx - currentPage) > evictRadius) {
+      if (pageIdx < evictBeforeIndex || pageIdx > evictAfterIndex) {
         keysToEvict.push(pageIdx);
         try {
           URL.revokeObjectURL(url);
@@ -640,10 +715,14 @@ export const FlipBookReader: React.FC<FlipBookProps> = ({
       keysToEvict.forEach(k => pageCache.current.delete(k));
       setPages(prev => {
         const next = [...prev];
+        let hasChanges = false;
         keysToEvict.forEach(k => {
-          next[k] = '';
+          if (next[k]) {
+            next[k] = '';
+            hasChanges = true;
+          }
         });
-        return next;
+        return hasChanges ? next : prev;
       });
     }
   }, [currentPage]);

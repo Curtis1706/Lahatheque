@@ -18,7 +18,13 @@ export async function GET(
   const searchParams = request.nextUrl.searchParams;
   const page = searchParams.get('page') || '1';
   const lang = searchParams.get('lang') || 'fr';
-  const targetUrl = `${DJANGO_API_URL}/v1/catalog/books/${id}/page/?page=${encodeURIComponent(page)}&lang=${encodeURIComponent(lang)}`;
+  const mode = searchParams.get('mode');
+  const sample = searchParams.get('sample');
+  const extraParams = [
+    mode ? `mode=${encodeURIComponent(mode)}` : '',
+    sample ? `sample=${encodeURIComponent(sample)}` : '',
+  ].filter(Boolean).join('&');
+  const targetUrl = `${DJANGO_API_URL}/v1/catalog/books/${id}/page/?page=${encodeURIComponent(page)}&lang=${encodeURIComponent(lang)}${extraParams ? `&${extraParams}` : ''}`;
 
   const accessToken = request.cookies.get('laha_access')?.value || request.cookies.get('access_token')?.value;
   const authHeader = request.headers.get('authorization');
