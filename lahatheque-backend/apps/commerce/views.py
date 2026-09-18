@@ -421,7 +421,7 @@ class OrderRetryPaymentView(APIView):
         }, status=status.HTTP_200_OK)
 
 
-class AdminCreateOrderView(CreateOrderView):
+class AdminCreateOrderView(APIView):
     """
     POST /api/v1/commerce/admin/orders/create-for-client/
     Permet à un Admin de créer une commande au nom d'un compte inscrit ou pour un client comptoir externe (sans compte).

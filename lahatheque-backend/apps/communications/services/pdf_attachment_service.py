@@ -92,11 +92,9 @@ class PdfAttachmentService:
         
         logo_bytes = cls._get_logo_bytes()
         if logo_bytes:
-            # Encart blanc chic et propre pour le logo sur fond Navy
-            page.draw_rect(fitz.Rect(35, 12, 140, 68), color=(1, 1, 1), fill=(1, 1, 1))
-            page.insert_image(fitz.Rect(38, 14, 137, 66), stream=logo_bytes, keep_proportion=True)
-            page.insert_text(fitz.Point(155, 43), "LAHATHÈQUE", fontsize=19, fontname="helv", color=(1, 1, 1))
-            page.insert_text(fitz.Point(155, 58), "Éditions & Bibliothèque Numérique", fontsize=8.5, fontname="helv", color=gold)
+            # Encart blanc chic pour le logo officiel (le logo contient déjà LAHATHÈQUE et sa signature)
+            page.draw_rect(fitz.Rect(35, 12, 180, 68), color=(1, 1, 1), fill=(1, 1, 1))
+            page.insert_image(fitz.Rect(38, 14, 177, 66), stream=logo_bytes, keep_proportion=True)
         else:
             page.insert_text(fitz.Point(40, 48), "LAHATHÈQUE", fontsize=22, fontname="helv", color=(1, 1, 1))
             page.insert_text(fitz.Point(40, 64), "Éditions & Bibliothèque Numérique", fontsize=9, fontname="helv", color=gold)
@@ -234,11 +232,9 @@ class PdfAttachmentService:
         
         logo_bytes = cls._get_logo_bytes()
         if logo_bytes:
-            # Encart blanc chic et propre pour le logo sur fond Navy
-            page.draw_rect(fitz.Rect(35, 12, 140, 68), color=(1, 1, 1), fill=(1, 1, 1))
-            page.insert_image(fitz.Rect(38, 14, 137, 66), stream=logo_bytes, keep_proportion=True)
-            page.insert_text(fitz.Point(155, 43), "LAHATHÈQUE", fontsize=19, fontname="helv", color=(1, 1, 1))
-            page.insert_text(fitz.Point(155, 58), "Bordereau Officiel de Droits & Redevances", fontsize=8.5, fontname="helv", color=gold)
+            # Encart blanc chic pour le logo officiel (le logo contient déjà LAHATHÈQUE et sa signature)
+            page.draw_rect(fitz.Rect(35, 12, 180, 68), color=(1, 1, 1), fill=(1, 1, 1))
+            page.insert_image(fitz.Rect(38, 14, 177, 66), stream=logo_bytes, keep_proportion=True)
         else:
             page.insert_text(fitz.Point(40, 48), "LAHATHÈQUE", fontsize=22, fontname="helv", color=(1, 1, 1))
             page.insert_text(fitz.Point(40, 64), "Bordereau Officiel de Droits & Redevances", fontsize=9, fontname="helv", color=gold)

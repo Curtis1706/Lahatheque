@@ -149,8 +149,7 @@ export async function generateOfficialPdf(rawOptions: PdfDocumentOptions): Promi
   // ── 2. En-tête : Marque et Coordonnées Émetteur
   let y = 16;
   
-  // Intégration du logo officiel LAHAThèque
-  let textStartX = margin;
+  let hasLogoImage = false;
   try {
     if (typeof window !== "undefined") {
       const img = new (window as any).Image();
@@ -161,24 +160,29 @@ export async function generateOfficialPdf(rawOptions: PdfDocumentOptions): Promi
         setTimeout(resolve, 400);
       });
       if (img.complete && img.naturalWidth > 0) {
-        doc.addImage(img, "PNG", margin, y - 6.5, 14, 14);
-        textStartX = margin + 17;
+        const aspect = img.naturalWidth / img.naturalHeight;
+        const logoHeight = 12;
+        const logoWidth = logoHeight * aspect;
+        doc.addImage(img, "PNG", margin, y - 6, logoWidth, logoHeight);
+        hasLogoImage = true;
       }
     }
   } catch {
-    textStartX = margin;
+    hasLogoImage = false;
   }
 
-  // Titre / Logo textuel de marque
-  doc.setFont("times", "bold");
-  doc.setFontSize(21);
-  doc.setTextColor(...navyRgb);
-  doc.text("LAHATHÈQUE", textStartX, y);
+  // Fallback textuel uniquement si l'image du logo n'est pas disponible
+  if (!hasLogoImage) {
+    doc.setFont("times", "bold");
+    doc.setFontSize(21);
+    doc.setTextColor(...navyRgb);
+    doc.text("LAHATHÈQUE", margin, y);
 
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(7);
-  doc.setTextColor(...goldRgb);
-  doc.text("ÉDITIONS & BIBLIOTHÈQUE NUMÉRIQUE", textStartX, y + 4.5);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(7);
+    doc.setTextColor(...goldRgb);
+    doc.text("ÉDITIONS & BIBLIOTHÈQUE NUMÉRIQUE", margin, y + 4.5);
+  }
 
   // Coordonnées légales à droite
   doc.setFont("helvetica", "normal");
