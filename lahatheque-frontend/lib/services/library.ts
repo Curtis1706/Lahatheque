@@ -13,6 +13,7 @@ export interface BookDetail {
   audio_file?: string;
   total_pages: number;
   file_size?: number;
+  sample_pages_count?: number;
   category?: string;
   subject?: string;
   description?: string;
@@ -75,8 +76,9 @@ export const libraryApi = {
             file: hasAccess
               ? normalizeBffStreamUrl(access?.stream_url, id)
               : (isSample ? `/api/bff/catalog/books/${id}/sample/` : `/api/bff/catalog/books/${id}/stream/`),
-            total_pages: ouvrage.page_count || 100,
+            total_pages: isSample ? (ouvrage.sample_pages_count || 10) : (ouvrage.page_count || 100),
             file_size: ouvrage.file_size_bytes || ouvrage.file_size || 0,
+            sample_pages_count: ouvrage.sample_pages_count || 10,
             category: ouvrage.discipline_name || "Ouvrage Académique",
             subject: ouvrage.collection_name || ouvrage.discipline_name || "Général",
             description: ouvrage.summary || "Ouvrage certifié LAHAThèque.",
@@ -107,8 +109,9 @@ export const libraryApi = {
             title: book.title,
             author: book.authors?.map((a: any) => a.full_name || `${a.first_name || ""} ${a.last_name || ""}`).join(", ") || "Auteur académique",
             file: isSample ? `/api/bff/catalog/books/${id}/sample/` : `/api/bff/catalog/books/${id}/stream/`,
-            total_pages: book.page_count || 100,
+            total_pages: isSample ? (book.sample_pages_count || 10) : (book.page_count || 100),
             file_size: book.file_size_bytes || book.file_size || 0,
+            sample_pages_count: book.sample_pages_count || 10,
             category: book.discipline_name || "Ouvrage Académique",
             subject: book.collection_name || book.discipline_name || "Général",
             description: book.summary || "Ouvrage certifié LAHAThèque.",

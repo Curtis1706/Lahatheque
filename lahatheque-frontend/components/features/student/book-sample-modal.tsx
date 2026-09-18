@@ -14,35 +14,37 @@ interface BookSampleModalProps {
 }
 
 export function BookSampleModal({ book, isOpen, onClose }: BookSampleModalProps) {
-  const [samplePdfBytes, setSamplePdfBytes] = useState<Uint8Array | null>(null);
-  const [samplePagesCount, setSamplePagesCount] = useState<number>(0);
-  const [loading, setLoading] = useState(false);
+  const [samplePagesCount, setSamplePagesCount] = useState<number>(() => book?.sample_pages_count || 10);
   const [error, setError] = useState<string | null>(null);
   const [reachedEnd, setReachedEnd] = useState(false);
 
   useEffect(() => {
     if (!isOpen || !book?.id) return;
 
-    setLoading(true);
-    setError(null);
     setReachedEnd(false);
+    setError(null);
 
-    fetch(`/api/bff/catalog/books/${book.id}/sample/`, { credentials: "include" })
-      .then(async (res) => {
-        if (!res.ok) {
-          const json = await res.json().catch(() => ({}));
-          throw new Error(json.error || "Extrait indisponible pour cet ouvrage.");
-        }
+    // Résolution asynchrone légère du nombre exact de pages d'extrait
+    fetch(`/api/bff/catalog/books/${book.id}/sample/`, {
+      method: "HEAD",
+      credentials: "include",
+    })
+      .then((res) => {
         const pages = res.headers.get("X-Sample-Pages") || res.headers.get("x-sample-pages");
-        setSamplePagesCount(pages ? parseInt(pages, 10) : 0);
-        const buf = await res.arrayBuffer();
-        setSamplePdfBytes(new Uint8Array(buf));
+        if (pages) {
+          setSamplePagesCount(parseInt(pages, 10));
+        }
       })
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false));
+      .catch(() => {
+        // Fallback transparent sur le sample_pages_count du livre
+      });
   }, [isOpen, book?.id]);
 
   if (!book) return null;
+
+  const effectiveTotalPages = samplePagesCount || book.sample_pages_count || 10;
+  const streamUrl = `/api/bff/catalog/books/${book.id}/sample/`;
+  const pageUrlTemplate = (page: number) => `/api/bff/catalog/books/${book.id}/page/?page=${page}&mode=sample`;
 
   return (
     <Modal
@@ -57,23 +59,19 @@ export function BookSampleModal({ book, isOpen, onClose }: BookSampleModalProps)
       maxWidth={800}
     >
       <div className="space-y-4 pt-2">
-        {loading && (
-          <div className="text-center py-12 space-y-2">
-            <p className="text-xs text-foreground-muted">Chargement de l&apos;extrait...</p>
-          </div>
-        )}
-
         {error && (
           <div className="text-center py-12 space-y-3">
             <p className="text-sm text-foreground-muted">{error}</p>
           </div>
         )}
 
-        {!loading && !error && samplePdfBytes && (
+        {!error && (
           <div className="rounded-2xl overflow-hidden border border-border bg-background-secondary" style={{ height: 480 }}>
             <FlipBook
-              fileUrl={samplePdfBytes}
+              fileUrl={streamUrl}
               bookId={`sample-${book.id}`}
+              pageUrlTemplate={pageUrlTemplate}
+              totalPages={effectiveTotalPages}
               onLastPageReached={() => setReachedEnd(true)}
               hideInternalHeader={true}
               hideQuiz={true}

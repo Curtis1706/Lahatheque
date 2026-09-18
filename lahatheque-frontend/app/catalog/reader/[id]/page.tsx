@@ -681,7 +681,9 @@ export default function DocumentReaderPage() {
         }
 
         setBook(data as any);
-        const initialTotalPages = (data as any).total_pages || (data as any).page_count || 0;
+        const initialTotalPages = isSample
+          ? ((data as any).sample_pages_count || (data as any).sample_pages || (data as any).total_pages || 10)
+          : ((data as any).total_pages || (data as any).page_count || 0);
         if (initialTotalPages > 0) {
           setTotalPages(initialTotalPages);
         }
@@ -1029,11 +1031,13 @@ export default function DocumentReaderPage() {
           isMobile={isMobile}
           isSample={isSampleMode}
           hideQuiz={isSampleMode}
-          pageUrlTemplate={!isSampleMode ? (page: number) => `/api/bff/catalog/books/${id}/page/?page=${page}&lang=${encodeURIComponent(currentLanguage)}` : undefined}
-          totalPages={(totalPages > 0 ? totalPages : (book?.total_pages || book?.page_count)) || undefined}
+          pageUrlTemplate={(page: number) => `/api/bff/catalog/books/${id}/page/?page=${page}&lang=${encodeURIComponent(currentLanguage)}${isSampleMode ? '&mode=sample' : ''}`}
+          totalPages={isSampleMode ? (book?.sample_pages_count || totalPages || 10) : ((totalPages > 0 ? totalPages : (book?.total_pages || book?.page_count)) || undefined)}
           onDocumentLoad={(num) => {
             setTotalPages(num);
-            syncProgress(currentPage, num);
+            if (!isSampleMode) {
+              syncProgress(currentPage, num);
+            }
           }}
           onLastPageReached={() => {
             if (isSampleMode) {

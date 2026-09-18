@@ -268,7 +268,7 @@ class BookSampleStreamView(APIView):
     """
     GET /api/v1/catalog/books/<book_id>/sample/ - Extrait gratuit RÉEL : les N premières
     pages du vrai fichier, filigranées "EXTRAIT GRATUIT". Accessible publiquement à tout visiteur,
-    sans exiger d'achat ni d'abonnement.
+    sans exiger d'achat ni d'abonnement. Supporte le streaming HTTP 206 Range (RFC 7233).
     """
     permission_classes = [AllowAny]
     renderer_classes = [PassthroughStreamRenderer, JSONRenderer]
@@ -277,6 +277,7 @@ class BookSampleStreamView(APIView):
         import fitz
         from apps.protection.source_adapter import DocumentSourceAdapter, DocumentSourceError
         from apps.catalog.models import Ouvrage, OuvrageLanguageVersion
+        from apps.protection.derived_materializer import DerivedMaterializer
 
         requested_lang = (request.query_params.get("lang") or request.query_params.get("language") or "").strip().lower()
 
@@ -297,12 +298,6 @@ class BookSampleStreamView(APIView):
                 return JsonResponse({"success": False, "error": "Ouvrage introuvable."}, status=404)
         except Exception:
             return JsonResponse({"success": False, "error": "Ouvrage introuvable."}, status=404)
-
-        source_ref = f"{ouvrage.id}:{requested_lang}" if requested_lang else str(ouvrage.id)
-        try:
-            full_pdf_bytes = DocumentSourceAdapter.get_document_bytes("catalog_book", source_ref)
-        except DocumentSourceError as e:
-            return JsonResponse({"success": False, "error": str(e)}, status=404)
 
         sample_pages = ouvrage.sample_pages_count
         if requested_lang:
@@ -326,47 +321,100 @@ class BookSampleStreamView(APIView):
                 else:
                     sample_pages = 20
 
-        try:
-            src_doc = fitz.open(stream=full_pdf_bytes, filetype="pdf")
-            extract_doc = fitz.open()
-            page_limit = min(sample_pages, src_doc.page_count)
-            extract_doc.insert_pdf(src_doc, from_page=0, to_page=page_limit - 1)
-
-            import math
-            for page in extract_doc:
-                rect = page.rect
-                page_width = rect.width
-                page_height = rect.height
-                theta = math.degrees(math.atan2(page_height, page_width))
-                watermark_text = "EXTRAIT GRATUIT — LAHAThèque"
-                font_size = max(14.0, min(24.0, float(page_width / 25)))
-                text_len = fitz.get_text_length(watermark_text, fontname="helv", fontsize=font_size)
-                center_point = fitz.Point(page_width / 2, page_height / 2)
-                start_point = fitz.Point(page_width / 2 - text_len / 2, page_height / 2 + font_size * 0.35)
-
-                page.insert_text(
-                    start_point,
-                    watermark_text,
-                    fontsize=font_size,
-                    color=(0.6, 0.6, 0.6),
-                    fill_opacity=0.45,
-                    morph=(center_point, fitz.Matrix(theta))
-                )
-
-            sample_bytes = extract_doc.tobytes(garbage=3, deflate=True)
-            total_pages = src_doc.page_count
-            src_doc.close()
-            extract_doc.close()
-        except Exception as e:
-            return JsonResponse({"success": False, "error": f"Impossible de générer l'extrait : {e}"}, status=500)
-
+        cache_dir = DerivedMaterializer._get_cache_dir()
+        sample_pdf_dir = os.path.join(cache_dir, "sample_pdfs")
+        os.makedirs(sample_pdf_dir, exist_ok=True)
         filename_suffix = f"-{requested_lang}" if requested_lang else ""
-        response = HttpResponse(sample_bytes, content_type="application/pdf")
+        sample_pdf_path = os.path.join(sample_pdf_dir, f"sample_{ouvrage.id}{filename_suffix}.pdf")
+
+        sample_bytes = None
+        total_pages = ouvrage.page_count or 100
+        page_limit = sample_pages
+        if os.path.exists(sample_pdf_path):
+            try:
+                with open(sample_pdf_path, "rb") as f:
+                    sample_bytes = f.read()
+            except Exception:
+                sample_bytes = None
+
+        if not sample_bytes:
+            source_ref = f"{ouvrage.id}:{requested_lang}" if requested_lang else str(ouvrage.id)
+            try:
+                full_pdf_bytes = DocumentSourceAdapter.get_document_bytes("catalog_book", source_ref)
+            except DocumentSourceError as e:
+                return JsonResponse({"success": False, "error": str(e)}, status=404)
+
+            try:
+                src_doc = fitz.open(stream=full_pdf_bytes, filetype="pdf")
+                extract_doc = fitz.open()
+                page_limit = min(sample_pages, src_doc.page_count)
+                extract_doc.insert_pdf(src_doc, from_page=0, to_page=page_limit - 1)
+
+                import math
+                for page in extract_doc:
+                    rect = page.rect
+                    page_width = rect.width
+                    page_height = rect.height
+                    theta = math.degrees(math.atan2(page_height, page_width))
+                    watermark_text = "EXTRAIT GRATUIT — LAHAThèque"
+                    font_size = max(14.0, min(24.0, float(page_width / 25)))
+                    text_len = fitz.get_text_length(watermark_text, fontname="helv", fontsize=font_size)
+                    center_point = fitz.Point(page_width / 2, page_height / 2)
+                    start_point = fitz.Point(page_width / 2 - text_len / 2, page_height / 2 + font_size * 0.35)
+
+                    page.insert_text(
+                        start_point,
+                        watermark_text,
+                        fontsize=font_size,
+                        color=(0.6, 0.6, 0.6),
+                        fill_opacity=0.45,
+                        morph=(center_point, fitz.Matrix(theta))
+                    )
+
+                sample_bytes = extract_doc.tobytes(garbage=3, deflate=True)
+                total_pages = src_doc.page_count
+                src_doc.close()
+                extract_doc.close()
+                try:
+                    with open(sample_pdf_path, "wb") as f:
+                        f.write(sample_bytes)
+                except Exception as w_err:
+                    logger.debug(f"[BookSampleStream] Écriture cache sample: {w_err}")
+            except Exception as e:
+                return JsonResponse({"success": False, "error": f"Impossible de générer l'extrait : {e}"}, status=500)
+
+        total_size = len(sample_bytes)
+        range_header = request.META.get("HTTP_RANGE")
+        if range_header and range_header.startswith("bytes="):
+            match = re.match(r"bytes=(\d+)-(\d*)", range_header)
+            if match:
+                start_str, end_str = match.groups()
+                start = int(start_str)
+                end = min(int(end_str), total_size - 1) if end_str else total_size - 1
+                if start < total_size and start <= end:
+                    chunk_length = end - start + 1
+                    chunk_data = sample_bytes[start:end + 1]
+                    response = HttpResponse(chunk_data, status=status.HTTP_206_PARTIAL_CONTENT, content_type="application/pdf")
+                    response["Content-Range"] = f"bytes {start}-{end}/{total_size}"
+                    response["Content-Length"] = str(chunk_length)
+                else:
+                    response = HttpResponse(status=status.HTTP_416_REQUESTED_RANGE_NOT_SATISFIABLE)
+                    response["Content-Range"] = f"bytes */{total_size}"
+                    return response
+            else:
+                response = HttpResponse(sample_bytes, content_type="application/pdf")
+                response["Content-Length"] = str(total_size)
+        else:
+            response = HttpResponse(sample_bytes, content_type="application/pdf")
+            response["Content-Length"] = str(total_size)
+
+        response["Accept-Ranges"] = "bytes"
         response["Content-Disposition"] = f'inline; filename="extrait-{ouvrage.id}{filename_suffix}.pdf"'
         response["X-Sample-Pages"] = str(page_limit)
         response["X-Sample-Total-Pages"] = str(total_pages)
-        response["Access-Control-Expose-Headers"] = "X-Sample-Pages, X-Sample-Total-Pages"
-        response["Cache-Control"] = "private, no-store, must-revalidate"
+        response["Access-Control-Expose-Headers"] = "Accept-Ranges, Content-Range, Content-Length, X-Sample-Pages, X-Sample-Total-Pages"
+        response["Cache-Control"] = "public, max-age=86400, must-revalidate"
+        response["X-Content-Type-Options"] = "nosniff"
         return response
 
 
@@ -603,59 +651,29 @@ class BookPageImageView(APIView):
     Modèle Scribd / Internet Archive : ouverture instantanée de la liseuse 3D sans
     téléchargement du PDF complet côté client.
 
+    Supporte :
+    - Le mode complet pour les utilisateurs authentifiés disposant des droits (avec filigrane nominatif).
+    - Le mode extrait gratuit (sample) accessible à tout visiteur public pour les pages 1 à N filigranées "EXTRAIT GRATUIT".
+
     Query params:
-      - page  : numéro de page 1-indexé (défaut: 1)
-      - lang  : code langue ISO 639-1 (défaut: fr)
+      - page   : numéro de page 1-indexé (défaut: 1)
+      - lang   : code langue ISO 639-1 (défaut: fr)
+      - mode   : 'sample' pour forcer l'extrait gratuit
+      - sample : 'true'|'1' pour forcer l'extrait gratuit
 
     Temps de réponse typique sur NVMe : <30ms (ou <1ms si déjà en cache page disque).
     Taille par page : ~30–60 Ko JPEG.
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
     renderer_classes = [PassthroughStreamRenderer, JSONRenderer]
 
     def get(self, request, book_id):
         import fitz
         from django.core.cache import cache as django_cache
+        from apps.protection.source_adapter import DocumentSourceAdapter, DocumentSourceError
+        from apps.protection.derived_materializer import DerivedMaterializer
 
-        requested_lang = request.query_params.get("lang") or request.query_params.get("language") or "fr"
-
-        # Session cache pour éviter les vérifications de droits répétées à chaque requête de page
-        session_cache_key = f"reader_session:{request.user.id}:{book_id}:{requested_lang}"
-        cached_session = django_cache.get(session_cache_key)
-
-        if cached_session:
-            access_result = cached_session["access_result"]
-            ouvrage = cached_session["ouvrage"]
-            effective_config = cached_session["effective_config"]
-        else:
-            access_result = AccessService.check_user_book_access(request.user, book_id, language=requested_lang)
-            if not access_result.get("access_granted"):
-                return JsonResponse({
-                    "success": False,
-                    "data": {},
-                    "error": access_result.get("error", "Accès non autorisé à cet ouvrage.")
-                }, status=status.HTTP_403_FORBIDDEN)
-
-            try:
-                ouvrage = Ouvrage.objects.filter(id=book_id).first()
-            except Exception:
-                ouvrage = Ouvrage.objects.filter(isbn=book_id).first()
-
-            if not ouvrage:
-                return JsonResponse({
-                    "success": False,
-                    "data": {},
-                    "error": "Ouvrage introuvable dans le catalogue."
-                }, status=status.HTTP_404_NOT_FOUND)
-
-            from apps.protection.models import GlobalDrmConfig
-            effective_config = GlobalDrmConfig.get_singleton()
-
-            django_cache.set(session_cache_key, {
-                "access_result": access_result,
-                "ouvrage": ouvrage,
-                "effective_config": effective_config,
-            }, timeout=300)
+        requested_lang = (request.query_params.get("lang") or request.query_params.get("language") or "fr").strip().lower()
 
         # Numéro de page demandé (1-indexé)
         try:
@@ -665,7 +683,175 @@ class BookPageImageView(APIView):
         except (ValueError, TypeError):
             page_num = 1
 
-        # Métadonnées utilisateur pour filigrane
+        # Résolution de l'ouvrage
+        ouvrage = None
+        import uuid
+        try:
+            if uuid.UUID(str(book_id)):
+                ouvrage = Ouvrage.objects.filter(id=book_id).first()
+        except (ValueError, AttributeError):
+            pass
+        if not ouvrage:
+            ouvrage = Ouvrage.objects.filter(Q(slug=book_id) | Q(isbn=book_id)).first()
+
+        if not ouvrage:
+            return JsonResponse({
+                "success": False,
+                "data": {},
+                "error": "Ouvrage introuvable dans le catalogue."
+            }, status=status.HTTP_404_NOT_FOUND)
+
+        # Calcul du plafond de pages pour l'extrait gratuit
+        sample_pages_limit = ouvrage.sample_pages_count
+        if requested_lang:
+            from apps.catalog.models import OuvrageLanguageVersion
+            lang_ver = OuvrageLanguageVersion.objects.filter(
+                ouvrage=ouvrage, language__iexact=requested_lang
+            ).first()
+            if lang_ver and lang_ver.page_count > 0:
+                pc = lang_ver.page_count
+                if pc <= 10:
+                    sample_pages_limit = min(5, pc)
+                elif pc <= 30:
+                    sample_pages_limit = 5
+                elif pc <= 50:
+                    sample_pages_limit = 7
+                elif pc <= 80:
+                    sample_pages_limit = 10
+                elif pc <= 150:
+                    sample_pages_limit = 12
+                elif pc <= 300:
+                    sample_pages_limit = 15
+                else:
+                    sample_pages_limit = 20
+
+        # Détection du mode extrait gratuit
+        is_sample_requested = (
+            request.query_params.get("sample") in ("true", "1")
+            or request.query_params.get("mode") == "sample"
+            or not request.user.is_authenticated
+        )
+
+        is_sample = False
+        effective_config = None
+        if is_sample_requested:
+            is_sample = True
+        else:
+            # Utilisateur authentifié : vérification des droits sur le livre complet
+            session_cache_key = f"reader_session:{request.user.id}:{ouvrage.id}:{requested_lang}"
+            cached_session = django_cache.get(session_cache_key)
+            if cached_session:
+                access_result = cached_session["access_result"]
+                effective_config = cached_session["effective_config"]
+            else:
+                access_result = AccessService.check_user_book_access(request.user, ouvrage.id, language=requested_lang)
+                from apps.protection.models import GlobalDrmConfig
+                effective_config = GlobalDrmConfig.get_singleton()
+                if access_result.get("access_granted"):
+                    django_cache.set(session_cache_key, {
+                        "access_result": access_result,
+                        "effective_config": effective_config,
+                    }, timeout=300)
+
+            if not access_result.get("access_granted"):
+                # Si l'utilisateur n'a pas accès au livre entier, bascule automatique sur l'extrait gratuit
+                if page_num <= sample_pages_limit:
+                    is_sample = True
+                else:
+                    return JsonResponse({
+                        "success": False,
+                        "data": {},
+                        "error": access_result.get("error", "Fin de l'extrait gratuit. Achetez l'ouvrage pour poursuivre la lecture.")
+                    }, status=status.HTTP_403_FORBIDDEN)
+
+        # ── BRANCHE A : MODE EXTRAIT GRATUIT (SAMPLE) ──
+        if is_sample:
+            if page_num > sample_pages_limit:
+                return JsonResponse({
+                    "success": False,
+                    "data": {},
+                    "error": "Fin de l'extrait gratuit. Achetez l'ouvrage pour poursuivre la lecture."
+                }, status=status.HTTP_403_FORBIDDEN)
+
+            cache_dir = DerivedMaterializer._get_cache_dir()
+            sample_pages_dir = os.path.join(cache_dir, "sample_pages", str(ouvrage.id), requested_lang)
+            os.makedirs(sample_pages_dir, exist_ok=True)
+            sample_page_image_path = os.path.join(sample_pages_dir, f"p{page_num}.jpg")
+
+            image_bytes = None
+            if os.path.exists(sample_page_image_path):
+                try:
+                    with open(sample_page_image_path, "rb") as f:
+                        image_bytes = f.read()
+                except Exception:
+                    image_bytes = None
+
+            if not image_bytes:
+                source_ref = f"{ouvrage.id}:{requested_lang}" if requested_lang else str(ouvrage.id)
+                try:
+                    full_pdf_bytes = DocumentSourceAdapter.get_document_bytes("catalog_book", source_ref)
+                except DocumentSourceError as e:
+                    return JsonResponse({"success": False, "data": {}, "error": str(e)}, status=404)
+
+                try:
+                    doc = fitz.open(stream=full_pdf_bytes, filetype="pdf")
+                    if page_num > len(doc):
+                        doc.close()
+                        return JsonResponse({
+                            "success": False,
+                            "data": {},
+                            "error": "Page hors limites."
+                        }, status=status.HTTP_404_NOT_FOUND)
+
+                    page = doc[page_num - 1]
+
+                    # Filigrane officiel Extrait Gratuit
+                    import math
+                    rect = page.rect
+                    page_width = rect.width
+                    page_height = rect.height
+                    theta = math.degrees(math.atan2(page_height, page_width))
+                    watermark_text = "EXTRAIT GRATUIT — LAHAThèque"
+                    font_size = max(14.0, min(24.0, float(page_width / 25)))
+                    text_len = fitz.get_text_length(watermark_text, fontname="helv", fontsize=font_size)
+                    center_point = fitz.Point(page_width / 2, page_height / 2)
+                    start_point = fitz.Point(page_width / 2 - text_len / 2, page_height / 2 + font_size * 0.35)
+
+                    page.insert_text(
+                        start_point,
+                        watermark_text,
+                        fontsize=font_size,
+                        color=(0.6, 0.6, 0.6),
+                        fill_opacity=0.45,
+                        morph=(center_point, fitz.Matrix(theta))
+                    )
+
+                    pix = page.get_pixmap(dpi=140)
+                    image_bytes = pix.tobytes("jpg", jpg_quality=85)
+                    doc.close()
+
+                    try:
+                        with open(sample_page_image_path, "wb") as f:
+                            f.write(image_bytes)
+                    except Exception as w_err:
+                        logger.debug(f"[BookPageImage] Non bloquant - écriture cache sample: {w_err}")
+                except Exception as render_err:
+                    logger.error(f"[BookPageImage] Erreur rendu page extrait {page_num}: {render_err}")
+                    return JsonResponse({
+                        "success": False,
+                        "data": {},
+                        "error": "Erreur lors du rendu de la page d'extrait."
+                    }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+            resp = HttpResponse(image_bytes, content_type="image/jpeg")
+            resp["Cache-Control"] = "public, max-age=86400, must-revalidate"
+            resp["Content-Length"] = str(len(image_bytes))
+            resp["Access-Control-Expose-Headers"] = "Content-Length, Content-Type, X-Sample-Pages"
+            resp["X-Sample-Pages"] = str(sample_pages_limit)
+            resp["X-Content-Type-Options"] = "nosniff"
+            return resp
+
+        # ── BRANCHE B : MODE COMPLET SÉCURISÉ (AUTHENTIFIÉ AVEC DROITS) ──
         ip = request.META.get("HTTP_X_FORWARDED_FOR")
         if ip:
             ip = ip.split(",")[0].strip()
@@ -685,7 +871,10 @@ class BookPageImageView(APIView):
         }
 
         # Matérialisation du dérivé PDF filigrané sur disque NVMe
-        source_ref = f"{book_id}:{requested_lang}" if requested_lang else str(book_id)
+        source_ref = f"{ouvrage.id}:{requested_lang}" if requested_lang else str(ouvrage.id)
+        if not effective_config:
+            from apps.protection.models import GlobalDrmConfig
+            effective_config = GlobalDrmConfig.get_singleton()
         try:
             cache_file_path, total_size, cache_key = DerivedMaterializer.get_or_create_derived_file_path(
                 source_type="catalog_book",

@@ -51,6 +51,7 @@ class OuvrageReadSerializer(serializers.ModelSerializer):
     available_languages = serializers.SerializerMethodField()
     languages = serializers.SerializerMethodField()
     price = serializers.SerializerMethodField()
+    sample_pages_count = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = Ouvrage
