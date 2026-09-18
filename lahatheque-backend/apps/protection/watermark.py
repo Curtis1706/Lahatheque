@@ -244,9 +244,9 @@ class WatermarkEngine:
             metadata["keywords"] = f"{metadata.get('keywords', '')} LTQ_SIG:{hashlib.sha256(invisible_payload.encode()).hexdigest()}"
             doc.set_metadata(metadata)
 
-        # Sérialisation ultra-rapide en mémoire avec linéarisation pour streaming HTTP 206
+        # Sérialisation rapide et compacte pour streaming HTTP 206
         try:
-            output_bytes = doc.tobytes(linear=True, deflate=False, garbage=1)
+            output_bytes = doc.tobytes(linear=False, deflate=True, garbage=1)
         except Exception:
             output_bytes = doc.tobytes(deflate=False, garbage=0)
         doc.close()

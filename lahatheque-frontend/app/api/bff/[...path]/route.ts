@@ -202,7 +202,7 @@ async function handleProxy(request: NextRequest, { params }: { params: Promise<{
       const sampleTotalPages = backendRes.headers.get('x-sample-total-pages')
       if (sampleTotalPages) forwardHeaders.set('x-sample-total-pages', sampleTotalPages)
 
-      forwardHeaders.set('access-control-expose-headers', 'X-Sample-Pages, X-Sample-Total-Pages, Content-Disposition')
+      forwardHeaders.set('access-control-expose-headers', 'Accept-Ranges, Content-Range, Content-Length, X-Sample-Pages, X-Sample-Total-Pages, Content-Disposition')
       forwardHeaders.set('cache-control', 'private, no-store, must-revalidate')
       forwardHeaders.set('x-content-type-options', 'nosniff')
 

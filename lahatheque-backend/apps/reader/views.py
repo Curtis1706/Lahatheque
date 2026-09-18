@@ -1055,6 +1055,7 @@ class ReaderProtectedStreamView(APIView):
             response["X-Accel-Redirect"] = f"/protected_derived/{cache_key}.pdf"
             response["Content-Disposition"] = f'inline; filename="{safe_title}.pdf"'
             response["Accept-Ranges"] = "bytes"
+            response["Access-Control-Expose-Headers"] = "Accept-Ranges, Content-Range, Content-Length"
             response["Cache-Control"] = "private, no-store, must-revalidate"
             response["Pragma"] = "no-cache"
             response["X-Content-Type-Options"] = "nosniff"
@@ -1071,6 +1072,7 @@ class ReaderProtectedStreamView(APIView):
                 response = HttpResponse(status=status.HTTP_416_REQUESTED_RANGE_NOT_SATISFIABLE)
                 response["Accept-Ranges"] = "bytes"
                 response["Content-Range"] = f"bytes */{total_size}"
+                response["Access-Control-Expose-Headers"] = "Accept-Ranges, Content-Range, Content-Length"
                 return response
 
             chunk_length = end_byte - start_byte + 1
@@ -1086,25 +1088,29 @@ class ReaderProtectedStreamView(APIView):
             response = FileResponse(open(cache_file_path, "rb"), content_type="application/pdf")
             response["Content-Length"] = str(total_size)
 
-        # 6. Journalisation légale
-        try:
-            doc_title = session.ouvrage.titre if session.ouvrage else session.custom_document_title
-            linked_inst = session.partner.linked_institution if (session.partner and hasattr(session.partner, 'linked_institution')) else None
-            TraceAcces.objects.create(
-                ouvrage=session.ouvrage,
-                partner_id=str(session.partner_id),
-                institution=linked_inst,
-                document_title=doc_title or "Document Partenaire",
-                ip_address=ip,
-                user_agent=request.META.get("HTTP_USER_AGENT", "")[:500],
-                access_type="read_chunk" if is_range_request else "read_full",
-                derived_hash=session.token_hash[:16] if session.token_hash else "nohash",
-                page_number=session.last_page or 1,
-            )
-        except Exception as log_err:
-            logger.warning(f"[ReaderStream] Erreur TraceAcces: {log_err}")
+        # 6. Journalisation légale avec throttle Redis (1 trace toutes les 300 secondes par session)
+        trace_throttle_key = f"trace_logged:reader_session:{session.id}"
+        if not cache.get(trace_throttle_key):
+            try:
+                doc_title = session.ouvrage.titre if session.ouvrage else session.custom_document_title
+                linked_inst = session.partner.linked_institution if (session.partner and hasattr(session.partner, 'linked_institution')) else None
+                TraceAcces.objects.create(
+                    ouvrage=session.ouvrage,
+                    partner_id=str(session.partner_id),
+                    institution=linked_inst,
+                    document_title=doc_title or "Document Partenaire",
+                    ip_address=ip,
+                    user_agent=request.META.get("HTTP_USER_AGENT", "")[:500],
+                    access_type="read_chunk" if is_range_request else "read_full",
+                    derived_hash=session.token_hash[:16] if session.token_hash else "nohash",
+                    page_number=session.last_page or 1,
+                )
+                cache.set(trace_throttle_key, True, timeout=300)
+            except Exception as log_err:
+                logger.warning(f"[ReaderStream] Erreur TraceAcces: {log_err}")
 
         response["Accept-Ranges"] = "bytes"
+        response["Access-Control-Expose-Headers"] = "Accept-Ranges, Content-Range, Content-Length"
         response["Cache-Control"] = "private, no-store, must-revalidate"
         response["Pragma"] = "no-cache"  # S-11 : compatibilite proxies HTTP/1.0
         response["X-Content-Type-Options"] = "nosniff"

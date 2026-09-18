@@ -6,6 +6,7 @@ Conforme à docs/drm/01-architecture-cible.md.
 import hashlib
 import logging
 import os
+import secrets
 from datetime import timedelta
 from typing import Any, Dict, Optional, Tuple
 from django.conf import settings
@@ -172,10 +173,28 @@ class DerivedMaterializer:
                 config=config
             )
             # Sauvegarde atomique sur disque local SSD NVMe
-            temp_file_path = f"{cache_file_path}.tmp.{os.getpid()}"
-            with open(temp_file_path, "wb") as f:
-                f.write(watermarked)
-            os.replace(temp_file_path, cache_file_path)
+            temp_file_path = f"{cache_file_path}.tmp.{os.getpid()}.{secrets.token_hex(8)}"
+            try:
+                with open(temp_file_path, "wb") as f:
+                    f.write(watermarked)
+                try:
+                    os.replace(temp_file_path, cache_file_path)
+                except PermissionError:
+                    if os.path.exists(cache_file_path) and os.path.getsize(cache_file_path) > 0:
+                        pass
+                    else:
+                        import time
+                        time.sleep(0.05)
+                        os.replace(temp_file_path, cache_file_path)
+            except Exception as e:
+                logger.error(f"Erreur écriture atomique cache dérivé ({cache_file_path}): {e}")
+                raise
+            finally:
+                if os.path.exists(temp_file_path):
+                    try:
+                        os.remove(temp_file_path)
+                    except OSError:
+                        pass
             return len(watermarked)
 
         file_size = 0

@@ -16,8 +16,8 @@ import { ReaderLanguageSelector } from '@/components/features/reader/reader-lang
 // Types
 import { Annotation } from './flipbook/types';
 
-const PAGE_RENDER_WINDOW = 6;
-const MAX_CACHED_PAGES = 10;
+const PAGE_RENDER_WINDOW = 12;
+const MAX_CACHED_PAGES = 50;
 
 const getPageRenderWindow = (pageIndex: number, totalPages: number) => {
   const maxStart = Math.max(totalPages - PAGE_RENDER_WINDOW, 0);
@@ -790,7 +790,7 @@ export const FlipBookReader: React.FC<FlipBookProps> = ({
               style={{ backgroundColor: 'transparent' }}
               startPage={effectiveInitialPage}
               drawShadow={!effectiveIsMobile}
-              flippingTime={effectiveIsMobile ? 400 : 700}
+              flippingTime={effectiveIsMobile ? 250 : 350}
               usePortrait={effectiveIsMobile}
               startZIndex={0}
               autoSize={true}

@@ -109,12 +109,27 @@ class PartnerCatalogPerformanceTestCase(APITestCase):
         self.assertEqual(resp_page.status_code, status.HTTP_200_OK)
         self.assertEqual(len(resp_page.json()["data"]), 1)
 
-    @patch("apps.protection.derived_materializer.DerivedMaterializer.get_or_create_derived")
+    @patch("apps.protection.models.BlockedReaderIdentity.objects.filter")
+    @patch("apps.protection.derived_materializer.DerivedMaterializer.get_or_create_derived_file_path")
     @patch("apps.reader.permissions.IsValidReaderSession.has_permission")
-    def test_reader_session_streaming_language_cascade(self, mock_has_perm, mock_materialize):
+    def test_reader_session_streaming_language_cascade(self, mock_has_perm, mock_materialize, mock_blocked):
         """Vérifie la cascade de résolution linguistique lors du streaming d'une session."""
+        mock_blocked.return_value.exists.return_value = False
+        import tempfile, os
+        temp_pdf = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
+        temp_pdf.write(b"%PDF-1.4 stream bytes with watermark")
+        temp_pdf.flush()
+        temp_pdf.close()
+        def safe_cleanup():
+            if os.path.exists(temp_pdf.name):
+                try:
+                    os.remove(temp_pdf.name)
+                except OSError:
+                    pass
+        self.addCleanup(safe_cleanup)
+
         mock_has_perm.return_value = True
-        mock_materialize.return_value = (b"%PDF-1.4 stream bytes with watermark", 34)
+        mock_materialize.return_value = (temp_pdf.name, 34, "mock_cache_key")
 
         end_user = PartnerEndUser.objects.create(
             partner=self.partner,

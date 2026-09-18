@@ -2,6 +2,7 @@
 Tests d'intégration du streaming bilingue sécurisé avec paramètre ?lang=fr/en.
 """
 from unittest.mock import patch
+from django.test import override_settings
 from rest_framework.test import APITestCase
 from rest_framework import status
 from apps.accounts.models import User
@@ -9,6 +10,14 @@ from apps.catalog.models import Ouvrage, OuvrageLanguageVersion
 from apps.commerce.models import Currency, Order, LigneCommande
 
 
+@override_settings(
+    CACHES={
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "test-multilingual-streaming-cache",
+        }
+    }
+)
 class MultilingualStreamingTestCase(APITestCase):
     """
     Vérifie la prise en charge du paramètre de langue dans l'endpoint de streaming.
@@ -65,15 +74,30 @@ class MultilingualStreamingTestCase(APITestCase):
             quantity=1,
         )
 
-    @patch("apps.protection.derived_materializer.DerivedMaterializer.get_or_create_derived")
+        import tempfile
+        self.temp_pdf = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
+        self.temp_pdf.write(b"%PDF-1.4 mock stream bytes")
+        self.temp_pdf.flush()
+        self.temp_pdf.close()
+
+    def tearDown(self):
+        import os
+        if hasattr(self, "temp_pdf") and os.path.exists(self.temp_pdf.name):
+            try:
+                os.remove(self.temp_pdf.name)
+            except OSError:
+                pass
+
+    @patch("apps.protection.derived_materializer.DerivedMaterializer.get_or_create_derived_file_path")
     def test_streaming_with_language_parameter(self, mock_materialize):
-        mock_materialize.return_value = (b"%PDF-1.4 mock stream bytes", 28)
+        mock_materialize.return_value = (self.temp_pdf.name, 28, "mock_cache_key")
 
         # Requête streaming en version anglaise (avec en-tête Range conforme DRM-01)
         resp_en = self.client.get(f"/api/v1/catalog/books/{self.ouvrage.id}/stream/?lang=en", HTTP_RANGE="bytes=0-27")
         self.assertIn(resp_en.status_code, [status.HTTP_200_OK, status.HTTP_206_PARTIAL_CONTENT])
         self.assertEqual(resp_en["Content-Type"], "application/pdf")
         self.assertIn("bytes", resp_en["Accept-Ranges"])
+        self.assertIn("Content-Range", resp_en["Access-Control-Expose-Headers"])
 
         # Vérifier que le materializer a reçu la référence avec ségrégation de langue
         mock_materialize.assert_called()
@@ -86,41 +110,44 @@ class MultilingualStreamingTestCase(APITestCase):
         call_args_fr = mock_materialize.call_args
         self.assertIn(f"{self.ouvrage.id}:fr", call_args_fr.kwargs.get("source_reference", ""))
 
-    @patch("apps.protection.derived_materializer.DerivedMaterializer.get_or_create_derived")
+    @patch("apps.protection.derived_materializer.DerivedMaterializer.get_or_create_derived_file_path")
     def test_streaming_without_range_returns_200_ok(self, mock_materialize):
         """
         Vérifie qu'une requête sans en-tête Range (initiée par FlipBook ou PDF.js)
         reçoit bien un statut HTTP 200 OK avec le contenu complet et Accept-Ranges: bytes.
         """
-        mock_materialize.return_value = (b"%PDF-1.4 mock stream bytes", 28)
+        mock_materialize.return_value = (self.temp_pdf.name, 28, "mock_cache_key")
 
         resp = self.client.get(f"/api/v1/catalog/books/{self.ouvrage.id}/stream/?lang=en")
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
         self.assertEqual(resp["Content-Type"], "application/pdf")
         self.assertEqual(resp["Content-Length"], "28")
-        self.assertEqual(resp["Accept-Ranges"], "bytes")
-        self.assertEqual(resp.content, b"%PDF-1.4 mock stream bytes")
+        self.assertIn("Accept-Ranges", resp["Access-Control-Expose-Headers"])
+        content_bytes = b"".join(resp.streaming_content) if hasattr(resp, "streaming_content") else resp.content
+        self.assertEqual(content_bytes, b"%PDF-1.4 mock stream bytes")
+        resp.close()
 
-    @patch("apps.protection.derived_materializer.DerivedMaterializer.get_or_create_derived")
+    @patch("apps.protection.derived_materializer.DerivedMaterializer.get_or_create_derived_file_path")
     def test_streaming_with_range_returns_206_partial(self, mock_materialize):
         """
         Vérifie qu'une requête avec en-tête Range partiel retourne bien HTTP 206 Partial Content.
         """
-        mock_materialize.return_value = (b"%PDF-1.4 mock stream bytes", 28)
+        mock_materialize.return_value = (self.temp_pdf.name, 28, "mock_cache_key")
 
         resp = self.client.get(f"/api/v1/catalog/books/{self.ouvrage.id}/stream/?lang=en", HTTP_RANGE="bytes=0-9")
         self.assertEqual(resp.status_code, status.HTTP_206_PARTIAL_CONTENT)
         self.assertEqual(resp["Content-Range"], "bytes 0-9/28")
         self.assertEqual(resp["Content-Length"], "10")
+        self.assertIn("Content-Range", resp["Access-Control-Expose-Headers"])
         self.assertEqual(len(resp.content), 10)
         self.assertEqual(resp.content, b"%PDF-1.4 m")
 
-    @patch("apps.protection.derived_materializer.DerivedMaterializer.get_or_create_derived")
+    @patch("apps.protection.derived_materializer.DerivedMaterializer.get_or_create_derived_file_path")
     def test_streaming_invalid_range_returns_416(self, mock_materialize):
         """
         Vérifie qu'un en-tête Range invalide (start >= total_size) retourne HTTP 416.
         """
-        mock_materialize.return_value = (b"%PDF-1.4 mock stream bytes", 28)
+        mock_materialize.return_value = (self.temp_pdf.name, 28, "mock_cache_key")
 
         resp = self.client.get(f"/api/v1/catalog/books/{self.ouvrage.id}/stream/?lang=en", HTTP_RANGE="bytes=100-200")
         self.assertEqual(resp.status_code, status.HTTP_416_REQUESTED_RANGE_NOT_SATISFIABLE)

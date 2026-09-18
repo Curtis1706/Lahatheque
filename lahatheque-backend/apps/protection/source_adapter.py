@@ -9,6 +9,7 @@ import io
 import ipaddress
 import logging
 import os
+import secrets
 import socket
 from urllib.parse import urlparse
 from typing import Any, Dict, List, Optional
@@ -30,6 +31,42 @@ class DocumentSourceAdapter:
     """
 
     MAX_BYTES_DEFAULT = getattr(settings, "DRM_MAX_REMOTE_FILE_SIZE_MB", 200) * 1024 * 1024
+
+    @classmethod
+    def _get_source_cache_dir(cls) -> str:
+        """Retourne le répertoire de cache SSD local pour les fichiers sources R2."""
+        cache_dir = getattr(settings, 'DRM_SOURCE_CACHE_DIR', None)
+        if not cache_dir:
+            cache_dir = os.path.join(settings.BASE_DIR, 'var', 'source_cache')
+        os.makedirs(cache_dir, exist_ok=True)
+        return cache_dir
+
+    @classmethod
+    def _atomic_write_file(cls, target_path: str, data: bytes) -> None:
+        """Écrit un fichier de manière atomique via un fichier temporaire et os.replace."""
+        import time
+        temp_path = f"{target_path}.tmp.{os.getpid()}.{secrets.token_hex(8)}"
+        try:
+            with open(temp_path, "wb") as f:
+                f.write(data)
+            try:
+                os.replace(temp_path, target_path)
+            except PermissionError:
+                # Sous Windows, si le fichier existe déjà et qu'un handle de lecture est ouvert
+                if os.path.exists(target_path) and os.path.getsize(target_path) > 0:
+                    pass
+                else:
+                    time.sleep(0.05)
+                    os.replace(temp_path, target_path)
+        except Exception as e:
+            logger.error(f"Erreur écriture atomique vers {target_path}: {e}")
+            raise
+        finally:
+            if os.path.exists(temp_path):
+                try:
+                    os.remove(temp_path)
+                except OSError:
+                    pass
 
     @classmethod
     def get_document_bytes(
@@ -76,27 +113,85 @@ class DocumentSourceAdapter:
         return cls.get_document_bytes(source_type, source_reference, options)
 
     @classmethod
-    def _fetch_r2_object(cls, r2_key: str) -> Optional[bytes]:
-        """Télécharge un objet depuis Cloudflare R2 (bucket livres en priorité, puis bucket plateforme)."""
-        from apps.catalog.services.cover_generator import get_r2_books_client, get_r2_s3_client
-        # 1. Essai sur le bucket laha-books-production (lecture seule)
-        try:
-            s3 = get_r2_books_client()
-            bucket = getattr(settings, 'CLOUDFLARE_R2_BOOKS_BUCKET_NAME', 'laha-books-production')
-            resp = s3.get_object(Bucket=bucket, Key=r2_key)
-            return resp['Body'].read()
-        except Exception as e1:
-            logger.debug(f"Objet R2 non trouvé dans bucket livres ({r2_key}): {e1}")
+    def _fetch_r2_object(cls, r2_key: str, version_token: Optional[str] = None) -> Optional[bytes]:
+        """
+        Télécharge un objet depuis Cloudflare R2 avec mise en cache SSD locale et verrou distribué anti-thundering herd.
+        """
+        cache_dir = cls._get_source_cache_dir()
+        cache_key_str = f"{r2_key}:{version_token}" if version_token else r2_key
+        cache_filename = f"{hashlib.sha256(cache_key_str.encode()).hexdigest()}.raw"
+        cache_path = os.path.join(cache_dir, cache_filename)
 
-        # 2. Fallback sur le bucket plateforme principal (lahatheque)
+        # 1. Vérification rapide du cache SSD local (0ms R2)
+        if os.path.exists(cache_path) and os.path.getsize(cache_path) > 0:
+            try:
+                with open(cache_path, "rb") as f:
+                    data = f.read()
+                if data:
+                    logger.debug(f"Cache SSD source R2 touché ({len(data)} octets) pour {r2_key}")
+                    return data
+            except Exception as e:
+                logger.warning(f"Erreur lecture cache SSD source ({cache_path}): {e}")
+
+        # 2. Téléchargement depuis R2 avec verrou anti-thundering herd
+        def download_from_r2() -> Optional[bytes]:
+            from apps.catalog.services.cover_generator import get_r2_books_client, get_r2_s3_client
+            # 1. Essai sur le bucket laha-books-production (lecture seule)
+            try:
+                s3 = get_r2_books_client()
+                bucket = getattr(settings, 'CLOUDFLARE_R2_BOOKS_BUCKET_NAME', 'laha-books-production')
+                resp = s3.get_object(Bucket=bucket, Key=r2_key)
+                return resp['Body'].read()
+            except Exception as e1:
+                logger.debug(f"Objet R2 non trouvé dans bucket livres ({r2_key}): {e1}")
+
+            # 2. Fallback sur le bucket plateforme principal (lahatheque)
+            try:
+                s3 = get_r2_s3_client()
+                bucket = getattr(settings, 'CLOUDFLARE_R2_BUCKET_NAME', 'lahatheque')
+                resp = s3.get_object(Bucket=bucket, Key=r2_key)
+                return resp['Body'].read()
+            except Exception as e2:
+                logger.error(f"Erreur téléchargement R2 pour {r2_key}: {e2}")
+            return None
+
+        redis_client = cls._get_redis_client()
+        if redis_client is None:
+            data = download_from_r2()
+            if data:
+                try:
+                    cls._atomic_write_file(cache_path, data)
+                except Exception as e:
+                    logger.warning(f"Échec écriture cache SSD source pour {r2_key}: {e}")
+            return data
+
+        lock_key = f"laha:r2_download:{hashlib.sha256(cache_filename.encode()).hexdigest()[:32]}"
         try:
-            s3 = get_r2_s3_client()
-            bucket = getattr(settings, 'CLOUDFLARE_R2_BUCKET_NAME', 'lahatheque')
-            resp = s3.get_object(Bucket=bucket, Key=r2_key)
-            return resp['Body'].read()
-        except Exception as e2:
-            logger.error(f"Erreur téléchargement R2 pour {r2_key}: {e2}")
-        return None
+            lock = redis_client.lock(lock_key, timeout=60, blocking_timeout=65)
+            with lock:
+                # Double-check après acquisition du verrou
+                if os.path.exists(cache_path) and os.path.getsize(cache_path) > 0:
+                    with open(cache_path, "rb") as f:
+                        data = f.read()
+                    if data:
+                        return data
+
+                data = download_from_r2()
+                if data:
+                    try:
+                        cls._atomic_write_file(cache_path, data)
+                    except Exception as e:
+                        logger.warning(f"Échec écriture cache SSD source pour {r2_key}: {e}")
+                return data
+        except Exception as e:
+            logger.error(f"Erreur verrou Redis téléchargement R2 ({r2_key}): {e}")
+            data = download_from_r2()
+            if data:
+                try:
+                    cls._atomic_write_file(cache_path, data)
+                except Exception as e2:
+                    logger.warning(f"Échec écriture cache SSD source ({r2_key}): {e2}")
+            return data
 
     @classmethod
     def _convert_epub_bytes_to_pdf(cls, epub_data: bytes) -> Optional[bytes]:
@@ -175,14 +270,15 @@ class DocumentSourceAdapter:
             """Effectue la conversion, l'upload R2 et la mise à jour BDD."""
             # Ré-vérification après acquisition du verrou (un autre process a peut-être déjà converti)
             lang_version.refresh_from_db()
+            v_token = str(lang_version.updated_at.timestamp()) if getattr(lang_version, 'updated_at', None) else None
             if lang_version.r2_key_pdf:
-                data = cls._fetch_r2_object(lang_version.r2_key_pdf)
+                data = cls._fetch_r2_object(lang_version.r2_key_pdf, version_token=v_token)
                 if data:
                     logger.info(f"EPUB deja converti par un autre process (r2_key_pdf: {lang_version.r2_key_pdf}).")
                     return data
 
             # Téléchargement de l'EPUB depuis R2
-            epub_data = cls._fetch_r2_object(epub_r2_key)
+            epub_data = cls._fetch_r2_object(epub_r2_key, version_token=v_token)
             if not epub_data:
                 logger.error(f"Impossible de télécharger l'EPUB depuis R2: {epub_r2_key}")
                 return None
@@ -194,12 +290,16 @@ class DocumentSourceAdapter:
                 return None
             logger.info(f"Conversion terminée : {len(pdf_data) // 1024} Ko de PDF généré.")
 
-            # Persistance sur R2 + mise à jour BDD
+            # Persistance sur R2 + mise à jour BDD + préchauffage cache SSD source
             if cls._upload_pdf_to_r2(pdf_data, pdf_r2_key):
                 try:
                     lang_version.r2_key_pdf = pdf_r2_key
                     lang_version.save(update_fields=['r2_key_pdf'])
                     logger.info(f"r2_key_pdf mis a jour en BDD : {pdf_r2_key}")
+                    new_v_token = str(lang_version.updated_at.timestamp()) if getattr(lang_version, 'updated_at', None) else None
+                    cache_key_str = f"{pdf_r2_key}:{new_v_token}" if new_v_token else pdf_r2_key
+                    cache_path = os.path.join(cls._get_source_cache_dir(), f"{hashlib.sha256(cache_key_str.encode()).hexdigest()}.raw")
+                    cls._atomic_write_file(cache_path, pdf_data)
                 except Exception as e:
                     logger.error(f"Echec mise a jour r2_key_pdf en BDD: {e}")
 
@@ -208,7 +308,8 @@ class DocumentSourceAdapter:
         if redis_client is None:
             # Fallback sans verrou si Redis est indisponible
             logger.warning("Redis indisponible - conversion EPUB sans verrou distribue (fallback gracieux).")
-            epub_data = cls._fetch_r2_object(epub_r2_key)
+            v_token = str(lang_version.updated_at.timestamp()) if getattr(lang_version, 'updated_at', None) else None
+            epub_data = cls._fetch_r2_object(epub_r2_key, version_token=v_token)
             return cls._convert_epub_bytes_to_pdf(epub_data) if epub_data else None
 
         try:
@@ -219,7 +320,8 @@ class DocumentSourceAdapter:
         except Exception as e:
             logger.error(f"Erreur verrou Redis pour conversion EPUB ({epub_r2_key}): {e}")
             # Fallback gracieux en cas d'erreur Redis
-            epub_data = cls._fetch_r2_object(epub_r2_key)
+            v_token = str(lang_version.updated_at.timestamp()) if getattr(lang_version, 'updated_at', None) else None
+            epub_data = cls._fetch_r2_object(epub_r2_key, version_token=v_token)
             return cls._convert_epub_bytes_to_pdf(epub_data) if epub_data else None
 
     @classmethod
@@ -245,8 +347,9 @@ class DocumentSourceAdapter:
             ).first()
 
         if lang_version:
+            v_token = str(lang_version.updated_at.timestamp()) if getattr(lang_version, 'updated_at', None) else None
             if lang_version.r2_key_pdf:
-                data = cls._fetch_r2_object(lang_version.r2_key_pdf)
+                data = cls._fetch_r2_object(lang_version.r2_key_pdf, version_token=v_token)
                 if data:
                     return data
             if lang_version.r2_key_epub:
@@ -268,8 +371,9 @@ class DocumentSourceAdapter:
                     ouvrage=ouvrage, language__iexact=requested_lang
                 ).first()
                 if lv:
+                    lv_token = str(lv.updated_at.timestamp()) if getattr(lv, 'updated_at', None) else None
                     if lv.r2_key_pdf:
-                        data = cls._fetch_r2_object(lv.r2_key_pdf)
+                        data = cls._fetch_r2_object(lv.r2_key_pdf, version_token=lv_token)
                         if data:
                             return data
                     if lv.r2_key_epub:
@@ -293,8 +397,9 @@ class DocumentSourceAdapter:
             # Si le fichier local n'existe pas mais qu'une déclinaison R2 originale existe
             orig_lv = OuvrageLanguageVersion.objects.filter(ouvrage=ouvrage).order_by('-is_original').first()
             if orig_lv:
+                orig_token = str(orig_lv.updated_at.timestamp()) if getattr(orig_lv, 'updated_at', None) else None
                 if orig_lv.r2_key_pdf:
-                    data = cls._fetch_r2_object(orig_lv.r2_key_pdf)
+                    data = cls._fetch_r2_object(orig_lv.r2_key_pdf, version_token=orig_token)
                     if data:
                         return data
                 if orig_lv.r2_key_epub:

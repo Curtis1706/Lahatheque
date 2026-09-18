@@ -162,6 +162,7 @@ class BookStreamView(APIView):
             response["X-Accel-Redirect"] = f"/protected_derived/{cache_key}.pdf"
             response["Content-Disposition"] = f'inline; filename="{safe_title}.pdf"'
             response["Accept-Ranges"] = "bytes"
+            response["Access-Control-Expose-Headers"] = "Accept-Ranges, Content-Range, Content-Length"
             response["Cache-Control"] = "private, no-store, must-revalidate"
             response["Pragma"] = "no-cache"
             response["X-Content-Type-Options"] = "nosniff"
@@ -213,6 +214,7 @@ class BookStreamView(APIView):
                 response = HttpResponse(status=status.HTTP_416_REQUESTED_RANGE_NOT_SATISFIABLE)
                 response["Accept-Ranges"] = "bytes"
                 response["Content-Range"] = f"bytes */{total_size}"
+                response["Access-Control-Expose-Headers"] = "Accept-Ranges, Content-Range, Content-Length"
                 return response
 
             chunk_length = end_byte - start_byte + 1
@@ -229,6 +231,7 @@ class BookStreamView(APIView):
             response["Content-Length"] = str(total_size)
 
         response["Accept-Ranges"] = "bytes"
+        response["Access-Control-Expose-Headers"] = "Accept-Ranges, Content-Range, Content-Length"
         response["Cache-Control"] = "private, no-store, must-revalidate"
         response["Pragma"] = "no-cache"
         response["X-Content-Type-Options"] = "nosniff"

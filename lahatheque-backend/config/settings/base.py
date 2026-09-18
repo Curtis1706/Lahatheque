@@ -317,6 +317,7 @@ FILE_UPLOAD_PERMISSIONS = 0o644
 # ── DRM & Protection Configuration ───────────────────────────────────────────
 FIELD_ENCRYPTION_KEY = config('FIELD_ENCRYPTION_KEY') if not DEBUG else config('FIELD_ENCRYPTION_KEY', default='0' * 64)
 DRM_DERIVED_CACHE_DIR = config('DRM_DERIVED_CACHE_DIR', default=str(BASE_DIR / 'var' / 'drm_cache'))
+DRM_SOURCE_CACHE_DIR = config('DRM_SOURCE_CACHE_DIR', default=str(BASE_DIR / 'var' / 'source_cache'))
 DRM_DERIVED_CACHE_TTL_HOURS = config('DRM_DERIVED_CACHE_TTL_HOURS', default=24, cast=int)
 DRM_WATERMARK_DEFAULT_OPACITY = 0.20
 DRM_MAX_REMOTE_FILE_SIZE_MB = 800

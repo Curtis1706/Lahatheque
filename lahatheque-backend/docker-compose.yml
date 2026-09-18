@@ -40,6 +40,8 @@ services:
     volumes:
       - media_data:/app/media
       - static_data:/app/staticfiles
+      - drm_cache_data:/app/var/drm_cache
+      - source_cache_data:/app/var/source_cache
     # Dans Coolify, Traefik route le domaine https://api.lahatheque.com directement vers le port 8000 interne
     # Pas besoin de binder le port 8000 sur l'hôte VPS (évite tout conflit de port avec d'autres apps)
     expose:
@@ -66,6 +68,8 @@ services:
       - .env
     volumes:
       - media_data:/app/media
+      - drm_cache_data:/app/var/drm_cache
+      - source_cache_data:/app/var/source_cache
     depends_on:
       redis:
         condition: service_healthy
@@ -100,6 +104,8 @@ volumes:
   redis_data:
   media_data:
   static_data:
+  drm_cache_data:
+  source_cache_data:
 
 networks:
   lahatheque_net:
