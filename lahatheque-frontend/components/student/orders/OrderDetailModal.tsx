@@ -4,7 +4,6 @@ import React, { useEffect } from "react";
 import { X, Printer, BookOpen, MapPin, ShoppingBag, ShieldCheck, Download } from "lucide-react";
 import { toast } from "sonner";
 import { StudentOrder } from "@/lib/types/student-orders";
-import { generateOfficialPdf } from "@/lib/services/export-service";
 import { useAuth } from "@/hooks/use-auth";
 
 interface OrderDetailModalProps {
@@ -36,10 +35,11 @@ export function OrderDetailModal({ order, isOpen, onClose }: OrderDetailModalPro
     const orderRef = `#${order.id.slice(0, 8).toUpperCase()}`;
     const filename = `facture_LAHA_${orderRef.replace("#", "")}.pdf`;
 
-    // 1. Téléchargement direct de la facture officielle certifiée générée par le backend (identique à l'email)
+    // Téléchargement direct de la facture officielle certifiée générée par le backend (identique à celle jointe à l'email)
     try {
       const res = await fetch(`/api/bff/commerce/orders/${order.id}/invoice/`, {
         method: "GET",
+        credentials: "include",
         headers: { Accept: "application/pdf" },
       });
 
@@ -56,49 +56,10 @@ export function OrderDetailModal({ order, isOpen, onClose }: OrderDetailModalPro
         toast.success("Facture PDF officielle téléchargée avec succès !");
         return;
       }
+      throw new Error("Échec du serveur");
     } catch (apiErr) {
-      console.warn("[OrderDetailModal] Re-tentative via générateur local:", apiErr);
-    }
-
-    // 2. Générateur de secours local (fallback) avec coordonnées officielles synchronisées
-    try {
-      const customerName = user
-        ? [user.first_name, user.last_name].filter(Boolean).join(" ") || "Client / Apprenant LAHAThèque"
-        : "Client / Apprenant LAHAThèque";
-      const customerEmail = user?.email || (order.livraison?.carrier_name ? `Transporteur : ${order.livraison.carrier_name}` : "contact@lahatheque.com");
-
-      await generateOfficialPdf({
-        docType: "FACTURE",
-        docNumber: orderRef,
-        date: new Date(order.created_at).toLocaleDateString("fr-FR"),
-        recipient: {
-          name: customerName,
-          roleOrTitle: "Compte Lecteur Agréé LAHAThèque",
-          addressOrCampus: order.livraison ? `${order.livraison.shipping_address}, ${order.livraison.city}` : "Livraison Numérique Instantanée",
-          emailOrPhone: customerEmail,
-        },
-        summaryCards: [
-          { label: "Articles", value: `${order.lignes?.length || 0} ouvrage(s)` },
-          { label: "Mode Livraison", value: order.livraison?.carrier_name || "Numérique Instantané" },
-          { label: "Paiement", value: order.statut_paiement === "paid" ? "Payé (Mobile Money)" : "En attente" },
-        ],
-        tableHeaders: ["Réf.", "Titre de l'Ouvrage", "Format", "Qté", "Prix Unitaire", "Total"],
-        tableRows: (order.lignes || []).map((l, idx) => [
-          `ART-${idx + 1}`,
-          l.ouvrage_title,
-          l.format_type === "paper" ? "Livre Papier" : "Numérique",
-          `${l.quantity} ex.`,
-          `${Number(l.unit_price).toLocaleString("fr-FR")} FCFA`,
-          `${(Number(l.unit_price) * l.quantity).toLocaleString("fr-FR")} FCFA`,
-        ]),
-        totalAmount: `${totalNumber.toLocaleString("fr-FR")} FCFA`,
-        totalLabel: order.statut_paiement === "paid" ? "TOTAL PAYÉ :" : "TOTAL NET À PAYER :",
-        totalNotes: "Facture et reçu de paiement certifiés LAHAThèque. Conforme aux normes UEMOA.",
-        filename: filename,
-      });
-      toast.success("Facture PDF officielle générée avec succès !");
-    } catch {
-      toast.error("Erreur lors du téléchargement de la facture.");
+      console.error("[OrderDetailModal] Erreur de téléchargement de la facture:", apiErr);
+      toast.error("Impossible de télécharger la facture officielle pour le moment.");
     }
   };
 

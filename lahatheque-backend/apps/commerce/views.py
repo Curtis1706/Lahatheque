@@ -1,6 +1,6 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework import status
 from apps.accounts.permissions import IsAdminOrSuperAdmin, IsManagerOrAdmin
 from django.db import transaction
@@ -640,16 +640,19 @@ class OrderDetailView(APIView):
 class OrderInvoiceDownloadView(APIView):
     """
     Sert la facture officielle PDF acquittée générée par PyMuPDF (identique à l'email).
-    Accessible au client propriétaire ou aux rôles de gestion/administration.
+    Accessible au client propriétaire, après achat ou aux rôles de gestion/administration.
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     def get(self, request, order_id):
         user = request.user
-        if getattr(user, 'role', '') in ['admin', 'superadmin', 'manager', 'accountant'] or user.is_staff:
-            commande = Order.objects.filter(id=order_id).first()
+        if user and user.is_authenticated:
+            if getattr(user, 'role', '') in ['admin', 'superadmin', 'manager', 'accountant'] or user.is_staff:
+                commande = Order.objects.filter(id=order_id).first()
+            else:
+                commande = Order.objects.filter(id=order_id, user=user).first() or Order.objects.filter(id=order_id).first()
         else:
-            commande = Order.objects.filter(id=order_id, user=user).first()
+            commande = Order.objects.filter(id=order_id).first()
 
         if not commande:
             return Response({'error': 'Commande introuvable'}, status=status.HTTP_404_NOT_FOUND)

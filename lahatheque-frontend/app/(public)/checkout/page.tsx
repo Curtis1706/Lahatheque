@@ -13,7 +13,8 @@ import {
   AlertCircle,
   Clock,
   MapPin,
-  Phone
+  Phone,
+  Download
 } from "lucide-react";
 import { useCart } from "@/context/cart-context";
 import { useAuth } from "@/hooks/use-auth";
@@ -37,6 +38,42 @@ export default function CheckoutPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [orderCompleted, setOrderCompleted] = useState<any | null>(null);
+  const [downloadingInvoice, setDownloadingInvoice] = useState(false);
+
+  const handleDownloadInvoice = async (orderId: string) => {
+    if (!orderId) return;
+    setDownloadingInvoice(true);
+    const orderRef = orderId.slice(0, 8).toUpperCase();
+    const filename = `facture_LAHA_${orderRef}.pdf`;
+
+    try {
+      const res = await fetch(`/api/bff/commerce/orders/${orderId}/invoice/`, {
+        method: "GET",
+        credentials: "include",
+        headers: { Accept: "application/pdf" },
+      });
+
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+        toast.success(`Facture officielle ${orderRef} téléchargée avec succès !`);
+        return;
+      }
+      throw new Error("Erreur serveur");
+    } catch (apiErr) {
+      console.error("[Checkout] Erreur téléchargement facture:", apiErr);
+      toast.error("Impossible de récupérer la facture officielle pour le moment.");
+    } finally {
+      setDownloadingInvoice(false);
+    }
+  };
 
   useEffect(() => {
     if (user && !recipientPhone) {
@@ -171,7 +208,17 @@ export default function CheckoutPage() {
               : "Vos accès de lecture sont désormais immédiatement actifs."}
           </p>
         </div>
-        <div className="flex flex-col sm:flex-row gap-3 w-full pt-4">
+        <button
+          type="button"
+          onClick={() => handleDownloadInvoice(orderCompleted.order_id || orderCompleted.id)}
+          disabled={downloadingInvoice}
+          className="w-full py-3.5 px-4 rounded-xl bg-gold hover:bg-gold/90 text-navy text-xs font-bold text-center shadow-md transition-colors inline-flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+        >
+          <Download className="w-4 h-4" />
+          <span>{downloadingInvoice ? "Téléchargement en cours..." : "Télécharger la Facture PDF (Reçu Officiel)"}</span>
+        </button>
+
+        <div className="flex flex-col sm:flex-row gap-3 w-full pt-1">
           <Link
             href="/student/orders"
             className="flex-1 py-3.5 px-4 rounded-xl bg-navy hover:bg-navy-hover text-white text-xs font-bold text-center shadow-md transition-colors"
