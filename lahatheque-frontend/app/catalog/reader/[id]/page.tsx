@@ -710,6 +710,11 @@ export default function DocumentReaderPage() {
     }
 
     const loadAll = async () => {
+      // Si l'utilisateur n'est pas connecté et n'est pas en mode extrait gratuit, ne pas tenter de charger
+      if (!isSampleMode && !user && !isAuthLoading) {
+        setIsLoading(false);
+        return;
+      }
       setIsLoading(true);
       try {
         const [, drm] = await Promise.all([
@@ -724,7 +729,7 @@ export default function DocumentReaderPage() {
       }
     };
     loadAll();
-  }, [id, router])
+  }, [id, router, user, isAuthLoading, isSampleMode])
 
 
 

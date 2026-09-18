@@ -106,7 +106,7 @@ export function proxy(request: NextRequest) {
     }
   }
 
-  // 5. Si non connecté et tente d'accéder à un espace protégé
+  // 5. Si non connecté et tente d'accéder à un espace protégé ou à la liseuse privée
   const protectedRoutes = [
     '/university',
     '/student',
@@ -119,12 +119,16 @@ export function proxy(request: NextRequest) {
     '/manager',
     '/admin'
   ]
-  const isProtectedRoute = protectedRoutes.some(route => pathname === route || pathname.startsWith(route + '/'))
+  const isReaderRoute = pathname.startsWith('/catalog/reader/')
+  const isSampleMode = request.nextUrl.searchParams.get('mode') === 'sample'
+  const isReaderProtected = isReaderRoute && !isSampleMode
+
+  const isProtectedRoute = isReaderProtected || protectedRoutes.some(route => pathname === route || pathname.startsWith(route + '/'))
   
   if (!isLoggedIn && isProtectedRoute && pathname !== '/login') {
     console.log(`[HTTP Auth ${now}] Accès refusé non-authentifié -> Redirection /login pour ${pathname}`)
     const loginUrl = new URL('/login', request.url)
-    loginUrl.searchParams.set('redirect', pathname)
+    loginUrl.searchParams.set('redirect', pathname + (search || ''))
     return NextResponse.redirect(loginUrl)
   }
 

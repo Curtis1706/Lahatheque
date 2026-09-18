@@ -27,7 +27,7 @@ def task_sync_r2_multilingual_books(self) -> Dict[str, Any]:
     """
     logger.info("[Celery Catalog] Démarrage de la synchronisation automatique R2...")
     try:
-        call_command("import_r2_multilingual_books")
+        call_command("import_r2_multilingual_books", live_r2=True)
         logger.info("[Celery Catalog] Synchronisation R2 terminée avec succès.")
         return {"success": True, "status": "completed"}
     except Exception as exc:
