@@ -209,6 +209,19 @@ class OuvrageReadSerializer(serializers.ModelSerializer):
                 return 0.0
         return 0.0
 
+    def to_representation(self, instance):
+        ret = super().to_representation(instance)
+        request = self.context.get('request')
+        user = getattr(request, 'user', None)
+        is_staff_or_admin = bool(
+            user and user.is_authenticated and (
+                user.is_staff or user.is_superuser or getattr(user, 'role', '') in ('admin', 'super_admin', 'chief_layout')
+            )
+        )
+        if not is_staff_or_admin:
+            ret.pop('file', None)
+        return ret
+
 
 # Alias pour rétrocompatibilité
 OuvrageSerializer = OuvrageReadSerializer

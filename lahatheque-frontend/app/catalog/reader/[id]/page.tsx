@@ -7,7 +7,7 @@ import {
   ArrowLeft, Moon, Sun,
   Save, Bookmark, Trash2, LayoutGrid, X, CheckCircle2,
   Volume2, VolumeX, Play, Pause, SkipBack, SkipForward, Music, Headphones, StopCircle, Mic2,
-  Edit3
+  Edit3, ShieldAlert
 } from "lucide-react"
 
 import { toast } from "sonner"
@@ -239,13 +239,14 @@ function AskExpertModal({ book, isOpen, onClose, onSuccess }: { book: any, isOpe
 export default function DocumentReaderPage() {
   const { id } = useParams()
   const router = useRouter()
-  const { user, activeRole } = useAuth()
+  const { user, activeRole, loading: isAuthLoading } = useAuth()
   const isStudent = user?.role === 'student' || activeRole === 'student'
 
   const [book, setBook] = useState<any>(null)
   const [rawPdfData, setRawPdfData] = useState<string | null>(null)
   const [isPdfLoading, setIsPdfLoading] = useState(false)
   const [pdfLoadError, setPdfLoadError] = useState<string | null>(null)
+  const [isAccessDenied, setIsAccessDenied] = useState(false)
   const [drmSettings, setDrmSettings] = useState<any>(null)
   const [bookLanguageResolved, setBookLanguageResolved] = useState(false)
 
@@ -260,10 +261,6 @@ export default function DocumentReaderPage() {
     toggleMute,
     togglePlaybackRate
   } = useAudioPlayer(book?.audio_file)
-
-
-
-
 
   const transformPdfGetDocumentParams = useCallback((options: any) => ({
     ...options,
@@ -285,7 +282,12 @@ export default function DocumentReaderPage() {
   const [isNightMode, setIsNightMode] = useState(false)
   const [currentPage, setCurrentPage] = useState(0)
   const [totalPages, setTotalPages] = useState(0)
-  const [isSampleMode, setIsSampleMode] = useState(false)
+  const [isSampleMode, setIsSampleMode] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return new URLSearchParams(window.location.search).get('mode') === 'sample'
+    }
+    return false
+  })
   const [showSampleEndOverlay, setShowSampleEndOverlay] = useState(false)
 
   useEffect(() => {
@@ -293,6 +295,17 @@ export default function DocumentReaderPage() {
       setIsSampleMode(new URLSearchParams(window.location.search).get('mode') === 'sample')
     }
   }, [])
+
+  // 🔒 Redirection immédiate si tentative d'accès sans session authentifiée (lien copié dans un autre navigateur)
+  useEffect(() => {
+    if (isAuthLoading) return;
+    if (!isSampleMode && !user) {
+      const redirectUrl = typeof window !== 'undefined'
+        ? window.location.pathname + window.location.search
+        : `/catalog/reader/${id}`;
+      router.push(`/login?redirect=${encodeURIComponent(redirectUrl)}`);
+    }
+  }, [isAuthLoading, isSampleMode, user, id, router])
 
   const [isSaving, setIsSaving] = useState(false)
   const [isQuestionModalOpen, setIsQuestionModalOpen] = useState(false)
@@ -633,21 +646,42 @@ export default function DocumentReaderPage() {
           return;
         }
 
-        const isSampleMode = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('mode') === 'sample';
+        if (!isSampleMode && !user && !isAuthLoading) {
+          setIsLoading(false);
+          return;
+        }
 
-        const data = await libraryApi.getBook(id as string).catch(() => ({
+        const isSample = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('mode') === 'sample';
+
+        const data = await libraryApi.getBook(id as string, isSample).catch(() => ({
           id: id as string,
-          title: "Extrait Gratuit",
+          title: isSample ? "Extrait Gratuit" : "Ouvrage",
           format_type: "pdf" as const,
           file: "",
           progress: { last_page: 0 },
           language: "fr",
           available_languages: ["fr"],
           languages: [],
+          has_access: false,
+          is_unauthenticated: !user,
         }));
-        setBook(data as any)
-        if (data && 'progress' in data && data.progress && !isSampleMode) {
-          setCurrentPage(data.progress.last_page || 0)
+
+        if (!isSample && (data.is_unauthenticated || !user)) {
+          setIsLoading(false);
+          return;
+        }
+
+        if (!isSample && data.has_access === false) {
+          setBook(data as any);
+          setIsAccessDenied(true);
+          setPdfLoadError("Vous ne disposez pas des droits d'accès requis pour consulter cet ouvrage dans votre bibliothèque.");
+          setIsLoading(false);
+          return;
+        }
+
+        setBook(data as any);
+        if (data && 'progress' in data && data.progress && !isSample) {
+          setCurrentPage(data.progress.last_page || 0);
         }
 
         const urlLang = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('lang') : null;
@@ -656,10 +690,10 @@ export default function DocumentReaderPage() {
         setBookLanguageResolved(true);
 
         // --- CHARGEMENT PROGRESSIF HAUTE PERFORMANCE (STREAMING HTTP 206 RFC 7233) ---
-        // Transmet immédiatement l'URL de streaming au lecteur sans attente bloquante
-        const targetStreamUrl = isSampleMode
+        // Transmet exclusivement l'URL de streaming sécurisé et jamais le fichier clair
+        const targetStreamUrl = isSample
           ? `/api/bff/catalog/books/${id}/sample/${langQuery}`
-          : ((data && data.file && !data.file.startsWith('/api/')) ? data.file : (id === 'lesson_pdf' ? '' : `/api/bff/catalog/books/${id}/stream/${langQuery}`));
+          : (id === 'lesson_pdf' ? (data?.file || '') : `/api/bff/catalog/books/${id}/stream/${langQuery}`);
 
         if (targetStreamUrl) {
           setRawPdfData(targetStreamUrl);
@@ -668,31 +702,10 @@ export default function DocumentReaderPage() {
           setPdfLoadError("Ce document est introuvable ou n'a pas encore été mis en ligne.");
           setIsLoading(false);
         }
-
-
-
-      } catch (err) {
-        console.warn("API indisponible, chargement du document de démonstration R2:", err)
-        const demoBook = {
-          id: id as string,
-          title: "Droit Constitutionnel des États d'Afrique Francophone",
-          file: "https://raw.githubusercontent.com/mozilla/pdf.js/ba2edeae/web/compressed.tracemonkey-pbf.pdf",
-          format_type: "pdf",
-          progress: { last_page: 0 }
-        }
-        setBook(demoBook)
-
-        try {
-          const streamRes = await fetch(demoBook.file)
-          if (streamRes.ok) {
-            const blob = await streamRes.blob()
-            setRawPdfData(URL.createObjectURL(blob))
-          } else {
-            setRawPdfData(demoBook.file)
-          }
-        } catch {
-          setRawPdfData(demoBook.file)
-        }
+      } catch (err: any) {
+        console.error("[Reader] Erreur lors du chargement de l'ouvrage:", err);
+        setPdfLoadError("Impossible de charger cet ouvrage. Veuillez vérifier votre connexion et vos accès.");
+        setIsLoading(false);
       }
     }
 
@@ -829,7 +842,100 @@ export default function DocumentReaderPage() {
     }
   }
 
-  if (isLoading || !book || isPdfLoading || !bookLanguageResolved) {
+  if (!isSampleMode && !isAuthLoading && !user) {
+    return (
+      <div className="h-screen flex flex-col select-none bg-navy-dark text-white">
+        <header className="px-4 md:px-8 flex items-center justify-between border-b border-navy-hover relative z-[100] bg-navy h-16 text-white">
+          <Button
+            onClick={() => router.push('/catalog')}
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9 rounded-lg inline-flex items-center justify-center p-0 text-gold bg-navy-dark hover:bg-navy border border-navy-hover cursor-pointer shrink-0 transition-colors"
+          >
+            <ArrowLeft size={18} />
+          </Button>
+          <span className="font-serif font-bold text-gold text-sm tracking-wide">LAHAThèque</span>
+          <div className="w-9" />
+        </header>
+        <main className="flex-1 flex flex-col items-center justify-center gap-4 text-center p-8">
+          <div className="w-16 h-16 rounded-full bg-gold/15 border border-gold/30 flex items-center justify-center text-gold mb-2 shadow-inner">
+            <ShieldAlert className="w-8 h-8" />
+          </div>
+          <h2 className="text-xl sm:text-2xl font-bold font-serif text-white">
+            Authentification Requise
+          </h2>
+          <p className="text-xs sm:text-sm text-white/80 max-w-md leading-relaxed">
+            Pour des raisons de sécurité et de protection des droits d&apos;auteur, la consultation de cet ouvrage nécessite une session active sur votre compte LAHAThèque.
+          </p>
+          <div className="flex flex-col sm:flex-row items-center gap-3 pt-2">
+            <Button
+              onClick={() => {
+                const currentUrl = typeof window !== 'undefined' ? window.location.pathname + window.location.search : `/catalog/reader/${id}`;
+                router.push(`/login?redirect=${encodeURIComponent(currentUrl)}`);
+              }}
+              className="px-6 py-2.5 rounded-xl bg-gold text-navy font-bold text-xs hover:brightness-110 transition-all cursor-pointer shadow-sm"
+            >
+              Se connecter
+            </Button>
+            <Button
+              onClick={() => router.push(`/catalog/reader/${id}?mode=sample`)}
+              variant="outline"
+              className="border-navy-hover bg-navy text-white text-xs font-semibold px-4 py-2.5 rounded-xl"
+            >
+              Lire l&apos;extrait gratuit
+            </Button>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  if (isAccessDenied) {
+    return (
+      <div className="h-screen flex flex-col select-none bg-navy-dark text-white">
+        <header className="px-4 md:px-8 flex items-center justify-between border-b border-navy-hover relative z-[100] bg-navy h-16 text-white">
+          <Button
+            onClick={() => router.push('/catalog')}
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9 rounded-lg inline-flex items-center justify-center p-0 text-gold bg-navy-dark hover:bg-navy border border-navy-hover cursor-pointer shrink-0 transition-colors"
+          >
+            <ArrowLeft size={18} />
+          </Button>
+          <span className="font-serif font-bold text-gold text-sm tracking-wide">LAHAThèque</span>
+          <div className="w-9" />
+        </header>
+        <main className="flex-1 flex flex-col items-center justify-center gap-4 text-center p-8">
+          <div className="w-16 h-16 rounded-full bg-gold/15 border border-gold/30 flex items-center justify-center text-gold mb-2 shadow-inner">
+            <ShieldAlert className="w-8 h-8" />
+          </div>
+          <h2 className="text-xl sm:text-2xl font-bold font-serif text-white">
+            Accès Non Autorisé
+          </h2>
+          <p className="text-xs sm:text-sm text-white/80 max-w-md leading-relaxed">
+            Vous ne disposez pas des droits d&apos;accès requis pour consulter cet ouvrage dans votre bibliothèque.
+          </p>
+          <div className="flex flex-col sm:flex-row items-center gap-3 pt-2">
+            <Button
+              onClick={() => router.push(`/catalog/reader/${id}?mode=sample`)}
+              className="px-6 py-2.5 rounded-xl bg-gold text-navy font-bold text-xs hover:brightness-110 transition-all cursor-pointer shadow-sm"
+            >
+              Consulter l&apos;extrait gratuit
+            </Button>
+            <Button
+              onClick={() => router.push('/catalog')}
+              variant="outline"
+              className="border-navy-hover bg-navy text-white text-xs font-semibold px-4 py-2.5 rounded-xl"
+            >
+              Retour au catalogue
+            </Button>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  if (isLoading || isAuthLoading || !book || isPdfLoading || !bookLanguageResolved) {
     return (
       <div className="h-screen bg-background flex flex-col items-center justify-center">
         <PageLoader label={isPdfLoading ? 'Chargement sécurisé du document' : 'Préparation de votre salle de lecture'} />
@@ -1170,6 +1276,23 @@ export default function DocumentReaderPage() {
                       scrollMode={ScrollMode.Vertical}
                       transformGetDocumentParams={transformPdfGetDocumentParams}
                       setRenderRange={setViewerRenderRange}
+                      renderError={() => (
+                        <div className="flex flex-col items-center justify-center h-full p-8 text-center text-white space-y-3">
+                          <div className="w-14 h-14 rounded-full bg-gold/15 border border-gold/30 flex items-center justify-center text-gold shadow-inner">
+                            <ShieldAlert className="w-7 h-7" />
+                          </div>
+                          <p className="font-serif font-bold text-base text-gold">Accès au flux de lecture sécurisé impossible</p>
+                          <p className="text-xs text-white/70 max-w-sm">
+                            Votre session a expiré ou ne dispose pas des droits requis pour cet ouvrage.
+                          </p>
+                          <Button
+                            onClick={() => router.push('/catalog')}
+                            className="px-4 py-2 rounded-xl bg-gold text-navy text-xs font-bold hover:bg-gold-hover mt-2 cursor-pointer"
+                          >
+                            Retour au catalogue
+                          </Button>
+                        </div>
+                      )}
                     />
                   </div>
                 </PdfWorker>
