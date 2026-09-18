@@ -83,6 +83,7 @@ export interface HostedReaderSessionData {
   user: HostedReaderEndUser;
   access_code?: string;
   session_token?: string;
+  device_binding_token?: string;
 }
 
 export interface QuizSubmitPayload {

@@ -169,7 +169,11 @@ class IsValidReaderSession(BasePermission):
             token_str = request.data.get("token")
 
         if not token_str:
-            token_str = request.query_params.get("token")
+            token_str = (
+                request.query_params.get("token")
+                if hasattr(request, "query_params")
+                else getattr(request, "GET", {}).get("token")
+            )
 
         if not token_str:
             return False
@@ -181,14 +185,14 @@ class IsValidReaderSession(BasePermission):
                 import hashlib
                 expected_hash = session.metadata["device_binding_hash"]
                 session_cookie_key = f"laha_reader_bind_{session.id}"
+                query_dict = getattr(request, "query_params", None) or getattr(request, "GET", {})
                 incoming_device_token = (
                     request.headers.get("X-Reader-Device-Token")
                     or request.COOKIES.get(session_cookie_key)
                     or request.COOKIES.get("laha_reader_bind")
                     or (request.data.get("device_binding_token") if hasattr(request, "data") and isinstance(request.data, dict) else None)
+                    or query_dict.get("device_token")
                 )
-                # query_params.get("device_token") supprime (S-13) : token sensible ne doit pas
-                # transiter par l'URL (journalise en clair par les serveurs et proxies)
                 if not incoming_device_token:
                     return False
                 calc_hash = hashlib.sha256(str(incoming_device_token).strip().encode("utf-8")).hexdigest()

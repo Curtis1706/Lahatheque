@@ -172,7 +172,7 @@ const Page = forwardRef<HTMLDivElement, PageProps>((props, ref) => {
                   style={{
                     fontSize: "14px",
                     fontWeight: 700,
-                    color: "#B08D42",
+                    color: "var(--gold)",
                     letterSpacing: "0.08em",
                     textTransform: "uppercase",
                     textAlign: "center",
@@ -187,7 +187,7 @@ const Page = forwardRef<HTMLDivElement, PageProps>((props, ref) => {
                     style={{
                       fontSize: "9px",
                       fontWeight: 600,
-                      color: "rgba(176, 141, 66, 0.85)",
+                      color: "color-mix(in srgb, var(--gold) 85%, transparent)",
                       fontFamily: "monospace",
                       letterSpacing: "0.04em",
                       marginTop: "4px",
@@ -204,7 +204,7 @@ const Page = forwardRef<HTMLDivElement, PageProps>((props, ref) => {
                   style={{
                     fontSize: "13px",
                     fontWeight: 800,
-                    color: "#B4AB6B",
+                    color: "var(--gold)",
                     letterSpacing: "0.06em",
                     textTransform: "uppercase",
                     textAlign: "center",
@@ -218,7 +218,7 @@ const Page = forwardRef<HTMLDivElement, PageProps>((props, ref) => {
                   style={{
                     fontSize: "10px",
                     fontWeight: 600,
-                    color: "rgba(180, 171, 107, 0.9)",
+                    color: "color-mix(in srgb, var(--gold) 90%, transparent)",
                     fontFamily: "monospace",
                     letterSpacing: "0.04em",
                     marginTop: "3px",
@@ -243,6 +243,55 @@ const Page = forwardRef<HTMLDivElement, PageProps>((props, ref) => {
   );
 });
 Page.displayName = 'Page';
+
+interface FlipBookPageImageProps {
+  src: string;
+  pageNumber: number;
+}
+
+const FlipBookPageImage: React.FC<FlipBookPageImageProps> = ({ src, pageNumber }) => {
+  const [hasError, setHasError] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+
+  if (hasError && retryCount >= 2) {
+    return (
+      <div className="w-full h-full flex flex-col items-center justify-center bg-background p-4 text-center text-xs text-foreground-muted space-y-2">
+        <span>Erreur de chargement de la page {pageNumber}</span>
+        <button
+          type="button"
+          onClick={() => {
+            setHasError(false);
+            setRetryCount(0);
+          }}
+          className="px-3 py-1 bg-navy text-gold border border-gold/30 rounded text-xs hover:bg-navy-hover transition-colors cursor-pointer"
+        >
+          Réessayer
+        </button>
+      </div>
+    );
+  }
+
+  const effectiveSrc = retryCount > 0 ? `${src}&_r=${retryCount}` : src;
+
+  return (
+    <img
+      src={effectiveSrc}
+      alt={`Page ${pageNumber}`}
+      className="w-full h-full object-cover"
+      loading="lazy"
+      draggable={false}
+      onError={() => {
+        if (retryCount < 2) {
+          setTimeout(() => {
+            setRetryCount((prev) => prev + 1);
+          }, 800);
+        } else {
+          setHasError(true);
+        }
+      }}
+    />
+  );
+};
 
 
 // ─── Main FlipBookReader Component ───────────────────────────
@@ -854,12 +903,9 @@ export const FlipBookReader: React.FC<FlipBookProps> = ({
                   watermarkUser={watermarkUser}
                 >
                   {pageSrc ? (
-                    <img
+                    <FlipBookPageImage
                       src={pageSrc}
-                      alt={`Page ${i + 1}`}
-                      className="w-full h-full object-cover"
-                      loading="lazy"
-                      draggable={false}
+                      pageNumber={i + 1}
                     />
                   ) : (
                     <div className="w-full h-full flex flex-col items-center justify-center bg-background space-y-2 text-gold">

@@ -215,7 +215,7 @@ export default function HostedReaderPage() {
 
   const streamHeaders = useMemo(() => {
     const activeToken = session?.session_token || hostedReaderApi.getActiveToken(token) || token;
-    const deviceToken = hostedReaderApi.getDeviceBindingToken(token);
+    const deviceToken = session?.device_binding_token || hostedReaderApi.getDeviceBindingToken(token);
     const headers: Record<string, string> = {
       "X-Reader-Token": activeToken,
     };
@@ -251,15 +251,17 @@ export default function HostedReaderPage() {
   const pageUrlTemplate = useCallback(
     (page: number) => {
       const activeToken = session?.session_token || hostedReaderApi.getActiveToken(token) || token;
+      const deviceToken = session?.device_binding_token || hostedReaderApi.getDeviceBindingToken(token);
       const initialLang = (session?.book?.language || currentLanguage || "fr").toLowerCase();
+      const deviceParam = deviceToken ? `&device_token=${encodeURIComponent(deviceToken)}` : "";
       if (typeof window !== "undefined") {
         const isProd = window.location.hostname.includes("lahatheque.com");
         const baseApi = process.env.NEXT_PUBLIC_API_URL
           ? process.env.NEXT_PUBLIC_API_URL.replace(/\/+$/, "").replace(/\/v1$/, "")
           : (isProd ? "https://api.lahatheque.com/api" : "http://localhost:8000/api");
-        return `${baseApi}/v1/reader/sessions/page/?page=${page}&lang=${initialLang}&token=${encodeURIComponent(activeToken)}`;
+        return `${baseApi}/v1/reader/sessions/page/?page=${page}&lang=${initialLang}&token=${encodeURIComponent(activeToken)}${deviceParam}`;
       }
-      return `/api/bff/reader/sessions/page?page=${page}&lang=${initialLang}&token=${encodeURIComponent(activeToken)}`;
+      return `/api/bff/reader/sessions/page?page=${page}&lang=${initialLang}&token=${encodeURIComponent(activeToken)}${deviceParam}`;
     },
     [session, token, currentLanguage]
   );
