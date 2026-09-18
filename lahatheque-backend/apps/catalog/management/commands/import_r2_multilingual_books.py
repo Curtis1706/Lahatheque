@@ -27,12 +27,14 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 
 import boto3
 from botocore.config import Config
+import datetime
 from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.db import transaction
 
 from apps.ai_engine.services.openai_service import (
     analyze_document_with_openai,
+    extract_publication_year_from_text,
     extract_text_sample_from_bytes,
 )
 from apps.catalog.models import BookAuthor, Discipline, Ouvrage, OuvrageLanguageVersion
@@ -82,6 +84,11 @@ class Command(BaseCommand):
             help="Chemin vers un fichier d'inventaire JSON (ex: r2_bucket_inventory.json) pour eviter de rescanner R2.",
         )
         parser.add_argument(
+            "--live-r2",
+            action="store_true",
+            help="Force le scan en direct du bucket Cloudflare R2 (ignore les fichiers d'inventaire locaux).",
+        )
+        parser.add_argument(
             "--checkpoint-file",
             type=str,
             default="import_r2_checkpoint.json",
@@ -94,6 +101,7 @@ class Command(BaseCommand):
         skip_cover = options.get("skip_cover", False)
         force_reanalyze = options.get("force_reanalyze", False)
         inventory_file = options.get("inventory_file", "")
+        live_r2 = options.get("live_r2", False)
         checkpoint_file = options.get("checkpoint_file", "import_r2_checkpoint.json")
 
         self.stdout.write(
@@ -112,6 +120,7 @@ class Command(BaseCommand):
             bucket_name=bucket_name,
             inventory_file=inventory_file,
             limit=limit,
+            live_r2=live_r2,
         )
 
         total_inventoried = len(grouped_books)
@@ -403,32 +412,32 @@ class Command(BaseCommand):
         bucket_name: str,
         inventory_file: str,
         limit: Optional[int],
+        live_r2: bool = False,
     ) -> Dict[str, Dict[str, Any]]:
         """
         Regroupe les cles R2 sous chaque UUID d'ouvrage.
-        Utilise le fichier d'inventaire local s'il est disponible pour accelerer le scan.
+        Si live_r2 est vrai, scanne directement le bucket Cloudflare R2 sans utiliser les vieux fichiers d'inventaire statiques.
         """
-        candidate_paths = [
-            inventory_file,
-            os.path.join(settings.BASE_DIR, "r2_bucket_inventory.json"),
-            os.path.join(settings.BASE_DIR, "..", "r2_bucket_inventory.json"),
-        ]
-
         loaded_files: List[Dict[str, Any]] = []
-        for path in candidate_paths:
-            if path and os.path.exists(path):
-                try:
-                    with open(path, "r", encoding="utf-8") as f:
-                        data = json.load(f)
-                        loaded_files = data.get("files", [])
-                        self.stdout.write(
-                            f"[Import R2] Inventaire charge depuis {path} ({len(loaded_files)} fichiers)"
-                        )
-                        break
-                except Exception as e:
-                    logger.warning(f"Impossible de lire l'inventaire {path}: {e}")
 
-        # Si pas d'inventaire local, scan en direct via paginator boto3
+        if not live_r2 and inventory_file:
+            candidate_paths = [
+                inventory_file,
+            ]
+            for path in candidate_paths:
+                if path and os.path.exists(path):
+                    try:
+                        with open(path, "r", encoding="utf-8") as f:
+                            data = json.load(f)
+                            loaded_files = data.get("files", [])
+                            self.stdout.write(
+                                f"[Import R2] Inventaire charge depuis {path} ({len(loaded_files)} fichiers)"
+                            )
+                            break
+                    except Exception as e:
+                        logger.warning(f"Impossible de lire l'inventaire {path}: {e}")
+
+        # Si pas d'inventaire explicite ou scan direct demande, interroger l'API R2
         if not loaded_files:
             self.stdout.write(
                 f"[Import R2] Scan en direct du bucket R2 '{bucket_name}' avec prefixe 'books/'..."
@@ -567,6 +576,26 @@ class Command(BaseCommand):
         publisher_name = ai_meta.get("publisher_name") or "LAHA Éditions"
         authors_list = ai_meta.get("authors") or ["Auteur LAHAThèque"]
 
+        # Extraction de la vraie année de publication (alignement avec fix_publication_dates)
+        pub_year = ai_meta.get("publication_year")
+        if not pub_year and text_sample:
+            pub_year = extract_publication_year_from_text(
+                text_sample,
+                filename=primary_pdf_key,
+                min_year=1500,
+            )
+
+        current_year = datetime.date.today().year
+        if pub_year and isinstance(pub_year, int) and (1500 <= pub_year <= current_year):
+            real_publication_date = datetime.date(pub_year, 1, 1)
+        else:
+            real_publication_date = None
+
+        if real_publication_date:
+            self.stdout.write(
+                f"[Import R2] Annee de parution detectee : {pub_year} (publication_date={real_publication_date})"
+            )
+
         # ETAPE 4 : Extraction couverture page 1 vers WebP et R2
         cover_url = ""
         if not skip_cover and pdf_bytes:
@@ -625,6 +654,7 @@ class Command(BaseCommand):
                     "summary": book_summary,
                     "dewey_code": dewey_code,
                     "publisher_name": publisher_name,
+                    "publication_date": real_publication_date,
                     "language": "en" if en_pdf_key else "fr",
                     "status": "published" if text_sample else "draft",
                     "price_digital": 5000.00,
