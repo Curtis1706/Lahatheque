@@ -977,7 +977,15 @@ class ReaderProtectedStreamView(APIView):
         effective_config = protection_config or global_drm
 
         # 2. Métadonnées utilisateur pour le filigrane nominatif
-        ip = request.META.get("HTTP_X_FORWARDED_FOR", request.META.get("REMOTE_ADDR", "127.0.0.1")).split(",")[0].strip()
+        client_ip = (
+            request.META.get("HTTP_CF_CONNECTING_IP")
+            or request.META.get("HTTP_X_REAL_IP")
+            or request.META.get("HTTP_X_FORWARDED_FOR")
+            or request.META.get("REMOTE_ADDR", "127.0.0.1")
+        ).split(",")[0].strip()
+        if (client_ip.startswith("10.") or client_ip.startswith("172.") or client_ip.startswith("127.")) and isinstance(session.metadata, dict) and session.metadata.get("user_ip"):
+            client_ip = str(session.metadata.get("user_ip"))
+        ip = client_ip
         doc_title = session.ouvrage.titre if session.ouvrage else session.custom_document_title or "Document"
         user_info = {
             "nom": session.end_user.display_name or session.end_user.external_ref,
@@ -1081,14 +1089,17 @@ class ReaderProtectedStreamView(APIView):
         # 6. Journalisation légale
         try:
             doc_title = session.ouvrage.titre if session.ouvrage else session.custom_document_title
+            linked_inst = session.partner.linked_institution if (session.partner and hasattr(session.partner, 'linked_institution')) else None
             TraceAcces.objects.create(
                 ouvrage=session.ouvrage,
                 partner_id=str(session.partner_id),
+                institution=linked_inst,
                 document_title=doc_title or "Document Partenaire",
                 ip_address=ip,
                 user_agent=request.META.get("HTTP_USER_AGENT", "")[:500],
                 access_type="read_chunk" if is_range_request else "read_full",
                 derived_hash=session.token_hash[:16] if session.token_hash else "nohash",
+                page_number=session.last_page or 1,
             )
         except Exception as log_err:
             logger.warning(f"[ReaderStream] Erreur TraceAcces: {log_err}")

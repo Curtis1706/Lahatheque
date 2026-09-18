@@ -151,8 +151,8 @@ class TraceAccesViewSet(ReadOnlyModelViewSet):
                     country = str(s.metadata.get("country") or "BJ")
 
                 total_pages = 1
-                if s.ouvrage and hasattr(s.ouvrage, "nombre_pages") and s.ouvrage.nombre_pages:
-                    total_pages = s.ouvrage.nombre_pages
+                if s.ouvrage:
+                    total_pages = getattr(s.ouvrage, "page_count", None) or getattr(s.ouvrage, "nombre_pages", None) or getattr(s.ouvrage, "pages", 1) or 1
                 elif isinstance(s.metadata, dict) and s.metadata.get("total_pages"):
                     try:
                         total_pages = int(s.metadata["total_pages"])
@@ -229,11 +229,48 @@ class TraceAccesViewSet(ReadOnlyModelViewSet):
 
         for t in traces_qs:
             t_id = str(t.id)
+
+            # Résolution de la session de lecture partenaire si t.user est None
+            cached_sess = None
+            if not t.user_id:
+                from apps.reader.models import ReaderSession
+                if t.derived_hash and t.derived_hash != 'nohash':
+                    cached_sess = ReaderSession.objects.filter(
+                        token_hash__startswith=t.derived_hash
+                    ).select_related('partner', 'end_user', 'ouvrage').first()
+                if not cached_sess and t.partner_id and t.ouvrage_id:
+                    cached_sess = ReaderSession.objects.filter(
+                        partner_id=t.partner_id, ouvrage_id=t.ouvrage_id
+                    ).select_related('partner', 'end_user', 'ouvrage').order_by('-created_at').first()
+
+            # Si cette session partenaire est déjà listée dans results (par la section 1), on ne duplique pas
+            if cached_sess and any(r["id"] == str(cached_sess.id) for r in results):
+                continue
             if any(r["id"] == t_id for r in results):
                 continue
 
-            u_email = t.user.email if t.user else "lecteur@lahatheque.com"
-            u_name = f"{t.user.first_name} {t.user.last_name}".strip() if t.user else "Lecteur Client"
+            # Informations lecteur et partenaire réelles
+            if t.user:
+                u_email = t.user.email
+                u_name = f"{t.user.first_name} {t.user.last_name}".strip() or t.user.username or t.user.email
+                partner_name = "Accès Direct"
+            elif cached_sess:
+                u_name = cached_sess.end_user.display_name if (cached_sess.end_user and cached_sess.end_user.display_name) else (
+                    cached_sess.partner.name if cached_sess.partner else "Lecteur Authentifié"
+                )
+                u_email = cached_sess.end_user.email if (cached_sess.end_user and cached_sess.end_user.email) else (
+                    f"contact@{cached_sess.partner.name.lower().replace(' ', '')}.com" if cached_sess.partner else "etudiant@institution.bj"
+                )
+                partner_name = cached_sess.partner.name if cached_sess.partner else "LAHACADEMIA"
+            elif t.institution:
+                u_name = f"Étudiant {t.institution.code}"
+                u_email = t.institution.contact_email or (t.institution.user.email if t.institution.user else "etudiant@institution.bj")
+                partner_name = t.institution.name
+            else:
+                u_name = t.document_title or "Lecteur Authentifié"
+                u_email = "lecteur@lahatheque.com"
+                partner_name = "Accès Direct"
+
             b_title = t.ouvrage.title if (t.ouvrage and hasattr(t.ouvrage, "title")) else (t.document_title or "Ouvrage Académique")
 
             # Couverture réelle de l'ouvrage
@@ -248,12 +285,14 @@ class TraceAccesViewSet(ReadOnlyModelViewSet):
             if not cover_url and t.ouvrage_id:
                 cover_url = f"/api/bff/catalog/books/{t.ouvrage_id}/cover/"
 
-            # Nombre total de pages réel
+            # Nombre total de pages réel (le modèle Ouvrage utilise page_count)
             total_pages = 1
-            if t.ouvrage and hasattr(t.ouvrage, "nombre_pages") and t.ouvrage.nombre_pages:
-                total_pages = t.ouvrage.nombre_pages
-            elif t.ouvrage and hasattr(t.ouvrage, "pages") and t.ouvrage.pages:
-                total_pages = t.ouvrage.pages
+            if t.ouvrage:
+                total_pages = getattr(t.ouvrage, "page_count", None) or getattr(t.ouvrage, "nombre_pages", None) or getattr(t.ouvrage, "pages", 1) or 1
+            elif cached_sess:
+                total_pages = getattr(cached_sess.ouvrage, "page_count", None) or (
+                    int(cached_sess.metadata.get("total_pages")) if isinstance(cached_sess.metadata, dict) and cached_sess.metadata.get("total_pages") else 1
+                )
 
             # Progression réelle de lecture
             rp = progress_map.get((t.user_id, t.ouvrage_id)) if (t.user_id and t.ouvrage_id) else None
@@ -264,6 +303,9 @@ class TraceAccesViewSet(ReadOnlyModelViewSet):
                 if rp.total_pages and rp.total_pages > 0:
                     total_pages = rp.total_pages
                 prog_pct = rp.progress_percent if rp.progress_percent is not None else int((current_page / max(total_pages, 1)) * 100)
+            elif cached_sess:
+                current_page = cached_sess.last_page or current_page
+                prog_pct = int((current_page / max(total_pages, 1)) * 100)
             else:
                 prog_pct = int((current_page / max(total_pages, 1)) * 100) if total_pages > 1 else (100 if current_page >= 1 else 0)
 
@@ -271,20 +313,22 @@ class TraceAccesViewSet(ReadOnlyModelViewSet):
 
             # Temps de lecture réel cumulé
             total_sec = session_time_map.get((t.user_id, t.ouvrage_id), 0)
+            if not total_sec and cached_sess:
+                total_sec = cached_sess.reading_time_seconds or 0
             reading_time_mins = max(1, int(total_sec // 60)) if total_sec > 0 else 1
 
             results.append({
                 "id": t_id,
                 "user_email": u_email,
-                "user_name": u_name or u_email,
-                "partner_name": "Accès Direct",
+                "user_name": u_name,
+                "partner_name": partner_name,
                 "book_title": b_title,
                 "book_id": str(t.ouvrage_id or ""),
                 "cover_url": cover_url,
                 "access_type": t.access_type or "read_chunk",
                 "ip_address": t.ip_address or "127.0.0.1",
                 "country": t.country or "BJ",
-                "device_fingerprint": t.user_agent or t.device_fingerprint or "Lecteur Web DRM",
+                "device_fingerprint": t.user_agent or t.device_fingerprint or (f"Web ({partner_name})" if partner_name != "Accès Direct" else "Lecteur Web DRM"),
                 "current_page": current_page,
                 "total_pages": total_pages,
                 "progress_percent": prog_pct,

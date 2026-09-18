@@ -146,12 +146,14 @@ def notify_admin_order_event(commande, event_type: str = "order_created", extra_
         for l in lignes:
             if l.format_type in ('paper', 'papier'):
                 has_physical = True
+            item_tot = float(getattr(l, 'total_price', None) or (l.quantity * (l.unit_price or 0)))
             items_list.append({
                 "title": l.ouvrage.title if l.ouvrage else "Ouvrage LAHAThèque",
                 "format_label": format_map.get(l.format_type, l.format_type),
                 "quantity": l.quantity,
                 "unit_price": float(l.unit_price or 0.0),
-                "total": float(getattr(l, 'total_price', None) or (l.quantity * (l.unit_price or 0))),
+                "total": item_tot,
+                "total_price": item_tot,
             })
 
         # Données de livraison si commande physique
@@ -229,7 +231,7 @@ def notify_admin_order_event(commande, event_type: str = "order_created", extra_
         for admin_email in set(admin_emails):
             send_transactional_email(
                 email_type="admin_order_notification",
-                to_email=str(admin_email),
+                to_email=admin_email,
                 subject=f"[ADMIN LAHAThèque] {event_title}",
                 template_name="emails/orders/admin_order_notification.html",
                 context=context,
