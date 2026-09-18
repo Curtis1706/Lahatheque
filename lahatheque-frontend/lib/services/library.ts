@@ -19,6 +19,8 @@ export interface BookDetail {
   language?: string;
   available_languages?: string[];
   languages?: any[];
+  has_access?: boolean;
+  is_unauthenticated?: boolean;
 }
 
 export interface QuizQuestion {
@@ -51,21 +53,27 @@ function normalizeBffStreamUrl(streamUrl: string | undefined, bookId: string): s
 const lastSyncProgressTimestamps: Record<string, number> = {};
 
 export const libraryApi = {
-  async getBook(id: string): Promise<BookDetail> {
+  async getBook(id: string, isSample = false): Promise<BookDetail> {
+    let isUnauthenticated = false;
     try {
       const res = await fetch(`/api/bff/student/books/${id}/`, {
         credentials: "include",
         cache: "no-store",
       });
-      if (res.ok) {
+      if (res.status === 401) {
+        isUnauthenticated = true;
+      } else if (res.ok) {
         const json = await res.json();
         if (json.success && json.data) {
           const { ouvrage, access, reading_progress } = json.data;
+          const hasAccess = Boolean(access?.access_granted);
           return {
             id: ouvrage.id,
             title: ouvrage.title,
             author: ouvrage.authors?.map((a: any) => a.full_name || `${a.first_name || ""} ${a.last_name || ""}`).join(", ") || "Auteur académique",
-            file: normalizeBffStreamUrl(access?.stream_url, id),
+            file: hasAccess
+              ? normalizeBffStreamUrl(access?.stream_url, id)
+              : (isSample ? `/api/bff/catalog/books/${id}/sample/` : `/api/bff/catalog/books/${id}/stream/`),
             total_pages: ouvrage.page_count || 100,
             category: ouvrage.discipline_name || "Ouvrage Académique",
             subject: ouvrage.collection_name || ouvrage.discipline_name || "Général",
@@ -74,6 +82,8 @@ export const libraryApi = {
             language: ouvrage.language || "fr",
             available_languages: ouvrage.available_languages || (ouvrage.language ? [ouvrage.language] : ["fr"]),
             languages: ouvrage.languages || [],
+            has_access: hasAccess,
+            is_unauthenticated: false,
           };
         }
       }
@@ -94,7 +104,7 @@ export const libraryApi = {
             id: book.id,
             title: book.title,
             author: book.authors?.map((a: any) => a.full_name || `${a.first_name || ""} ${a.last_name || ""}`).join(", ") || "Auteur académique",
-            file: `/api/bff/catalog/books/${id}/stream/`,
+            file: isSample ? `/api/bff/catalog/books/${id}/sample/` : `/api/bff/catalog/books/${id}/stream/`,
             total_pages: book.page_count || 100,
             category: book.discipline_name || "Ouvrage Académique",
             subject: book.collection_name || book.discipline_name || "Général",
@@ -103,6 +113,8 @@ export const libraryApi = {
             language: book.language || "fr",
             available_languages: book.available_languages || (book.language ? [book.language] : ["fr"]),
             languages: book.languages || [],
+            has_access: false,
+            is_unauthenticated: isUnauthenticated,
           };
         }
       }
@@ -114,7 +126,7 @@ export const libraryApi = {
       id,
       title: "Document Numérique LAHAThèque",
       author: "Éditions LAHAThèque",
-      file: `/api/bff/catalog/books/${id}/stream/`,
+      file: isSample ? `/api/bff/catalog/books/${id}/sample/` : `/api/bff/catalog/books/${id}/stream/`,
       total_pages: 50,
       category: "Académique",
       description: "Ouvrage et document numérique certifié LAHAThèque.",
@@ -122,6 +134,8 @@ export const libraryApi = {
       language: "fr",
       available_languages: ["fr"],
       languages: [],
+      has_access: false,
+      is_unauthenticated: isUnauthenticated,
     };
   },
 
