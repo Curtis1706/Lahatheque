@@ -1017,6 +1017,8 @@ export default function DocumentReaderPage() {
           isMobile={isMobile}
           isSample={isSampleMode}
           hideQuiz={isSampleMode}
+          pageUrlTemplate={!isSampleMode ? (page: number) => `/api/bff/catalog/books/${id}/page/?page=${page}&lang=${currentLanguage}` : undefined}
+          totalPages={(totalPages > 0 ? totalPages : book?.page_count) || undefined}
           onDocumentLoad={(num) => {
             setTotalPages(num);
             syncProgress(currentPage, num);

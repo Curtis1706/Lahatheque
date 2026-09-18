@@ -20,6 +20,7 @@ from .stream_views import (
     BookStreamStatusView,
     BookSampleStreamView,
     BookCoverStreamView,
+    BookPageImageView,
 )
 
 app_name = 'catalog'
@@ -47,6 +48,7 @@ urlpatterns = [
     path('books/<str:book_id>/stream/status/', BookStreamStatusView.as_view(), name='book-stream-status'),
     path('books/<str:book_id>/sample/', BookSampleStreamView.as_view(), name='book-sample-stream'),
     path('books/<str:book_id>/cover/', BookCoverStreamView.as_view(), name='book-cover-stream'),
+    path('books/<str:book_id>/page/', BookPageImageView.as_view(), name='book-page-image'),
     path('recommendations/', PersonalizedRecommendationsView.as_view(), name='catalog-recommendations'),
     path('catalog/recommendations/', PersonalizedRecommendationsView.as_view()),
 ] + router.urls

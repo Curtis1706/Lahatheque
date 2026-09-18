@@ -596,4 +596,158 @@ class BookStreamStatusView(APIView):
         return Response({"success": True, "data": {"status": "ready" if is_ready else "preparing"}})
 
 
+class BookPageImageView(APIView):
+    """
+    GET /api/v1/catalog/books/<book_id>/page/
+    Sert une page spécifique du document sécurisé sous forme d'image JPEG optimisée.
+    Modèle Scribd / Internet Archive : ouverture instantanée de la liseuse 3D sans
+    téléchargement du PDF complet côté client.
+
+    Query params:
+      - page  : numéro de page 1-indexé (défaut: 1)
+      - lang  : code langue ISO 639-1 (défaut: fr)
+
+    Temps de réponse typique sur NVMe : <30ms (ou <1ms si déjà en cache page disque).
+    Taille par page : ~30–60 Ko JPEG.
+    """
+    permission_classes = [IsAuthenticated]
+    renderer_classes = [PassthroughStreamRenderer, JSONRenderer]
+
+    def get(self, request, book_id):
+        import fitz
+        from django.core.cache import cache as django_cache
+
+        requested_lang = request.query_params.get("lang") or request.query_params.get("language") or "fr"
+
+        # Session cache pour éviter les vérifications de droits répétées à chaque requête de page
+        session_cache_key = f"reader_session:{request.user.id}:{book_id}:{requested_lang}"
+        cached_session = django_cache.get(session_cache_key)
+
+        if cached_session:
+            access_result = cached_session["access_result"]
+            ouvrage = cached_session["ouvrage"]
+            effective_config = cached_session["effective_config"]
+        else:
+            access_result = AccessService.check_user_book_access(request.user, book_id, language=requested_lang)
+            if not access_result.get("access_granted"):
+                return JsonResponse({
+                    "success": False,
+                    "data": {},
+                    "error": access_result.get("error", "Accès non autorisé à cet ouvrage.")
+                }, status=status.HTTP_403_FORBIDDEN)
+
+            try:
+                ouvrage = Ouvrage.objects.filter(id=book_id).first()
+            except Exception:
+                ouvrage = Ouvrage.objects.filter(isbn=book_id).first()
+
+            if not ouvrage:
+                return JsonResponse({
+                    "success": False,
+                    "data": {},
+                    "error": "Ouvrage introuvable dans le catalogue."
+                }, status=status.HTTP_404_NOT_FOUND)
+
+            from apps.protection.models import GlobalDrmConfig
+            effective_config = GlobalDrmConfig.get_singleton()
+
+            django_cache.set(session_cache_key, {
+                "access_result": access_result,
+                "ouvrage": ouvrage,
+                "effective_config": effective_config,
+            }, timeout=300)
+
+        # Numéro de page demandé (1-indexé)
+        try:
+            page_num = int(request.query_params.get("page", 1))
+            if page_num < 1:
+                page_num = 1
+        except (ValueError, TypeError):
+            page_num = 1
+
+        # Métadonnées utilisateur pour filigrane
+        ip = request.META.get("HTTP_X_FORWARDED_FOR")
+        if ip:
+            ip = ip.split(",")[0].strip()
+        else:
+            ip = request.META.get("REMOTE_ADDR", "127.0.0.1")
+
+        doc_title = getattr(ouvrage, "title", None) or "Document"
+        user_info = {
+            "nom": request.user.get_full_name() or request.user.username,
+            "email": request.user.email,
+            "ip": ip,
+            "user_id": str(request.user.id),
+            "device_fingerprint": request.headers.get("X-Device-Fingerprint", ""),
+            "title": doc_title,
+            "id": str(ouvrage.id),
+            "is_partner": False,
+        }
+
+        # Matérialisation du dérivé PDF filigrané sur disque NVMe
+        source_ref = f"{book_id}:{requested_lang}" if requested_lang else str(book_id)
+        try:
+            cache_file_path, total_size, cache_key = DerivedMaterializer.get_or_create_derived_file_path(
+                source_type="catalog_book",
+                source_reference=source_ref,
+                user_info=user_info,
+                config=effective_config,
+            )
+        except Exception as e:
+            logger.error(f"[BookPageImage] Erreur matérialisation ({book_id}): {e}")
+            return JsonResponse({
+                "success": False,
+                "data": {},
+                "error": "Impossible de charger le document sécurisé."
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        # Cache disque NVMe pour les images de pages individuelles
+        cache_dir = DerivedMaterializer._get_cache_dir()
+        pages_dir = os.path.join(cache_dir, "pages", cache_key)
+        os.makedirs(pages_dir, exist_ok=True)
+        page_image_path = os.path.join(pages_dir, f"p{page_num}.jpg")
+
+        image_bytes = None
+        if os.path.exists(page_image_path):
+            try:
+                with open(page_image_path, "rb") as f:
+                    image_bytes = f.read()
+            except Exception:
+                image_bytes = None
+
+        if not image_bytes:
+            try:
+                doc = fitz.open(cache_file_path)
+                if page_num > len(doc):
+                    doc.close()
+                    return JsonResponse({
+                        "success": False,
+                        "data": {},
+                        "error": "Page hors limites."
+                    }, status=status.HTTP_404_NOT_FOUND)
+                page = doc[page_num - 1]
+                pix = page.get_pixmap(dpi=140)
+                image_bytes = pix.tobytes("jpg", jpg_quality=85)
+                doc.close()
+                try:
+                    with open(page_image_path, "wb") as f:
+                        f.write(image_bytes)
+                except Exception as w_err:
+                    logger.debug(f"[BookPageImage] Non bloquant - écriture cache page: {w_err}")
+            except Exception as render_err:
+                logger.error(f"[BookPageImage] Erreur rendu page {page_num}: {render_err}")
+                return JsonResponse({
+                    "success": False,
+                    "data": {},
+                    "error": "Erreur lors du rendu de la page."
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        resp = HttpResponse(image_bytes, content_type="image/jpeg")
+        resp["Cache-Control"] = "private, max-age=86400, must-revalidate"
+        resp["Content-Length"] = str(len(image_bytes))
+        resp["Access-Control-Expose-Headers"] = "Content-Length, Content-Type"
+        resp["X-Content-Type-Options"] = "nosniff"
+        return resp
+
+
 
