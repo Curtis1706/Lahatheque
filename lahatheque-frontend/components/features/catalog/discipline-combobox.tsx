@@ -68,13 +68,13 @@ export function DisciplineCombobox({
 
     rawList.forEach((item) => {
       const name = typeof item === "string" ? item : item.name;
-      const dewey = typeof item === "string" ? undefined : item.code_dewey;
+      // const dewey = typeof item === "string" ? undefined : item.code_dewey;
       const isAlreadySelected = multiple && values.includes(name);
 
       list.push({
         value: name,
         label: name,
-        subtitle: dewey ? `Dewey ${dewey}` : undefined,
+        // subtitle: dewey ? `Dewey ${dewey}` : undefined, // Masqué à la demande : non visible client/visiteur
         badge: isAlreadySelected ? "Sélectionné" : undefined,
       });
     });
