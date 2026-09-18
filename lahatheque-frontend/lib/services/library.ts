@@ -48,6 +48,8 @@ function normalizeBffStreamUrl(streamUrl: string | undefined, bookId: string): s
   return streamUrl;
 }
 
+const lastSyncProgressTimestamps: Record<string, number> = {};
+
 export const libraryApi = {
   async getBook(id: string): Promise<BookDetail> {
     try {
@@ -128,9 +130,18 @@ export const libraryApi = {
     currentPage?: number,
     totalPages?: number,
     durationSeconds?: number,
-    pagesRead?: number
+    pagesRead?: number,
+    force: boolean = false
   ): Promise<boolean> {
     try {
+      const now = Date.now();
+      const lastSync = lastSyncProgressTimestamps[bookId] || 0;
+      // Temporisation (debounce) : n'émettre au serveur que toutes les 30s sauf si forcé (ex: fermeture)
+      if (!force && (now - lastSync < 30000)) {
+        return true;
+      }
+      lastSyncProgressTimestamps[bookId] = now;
+
       const page = Math.max(1, currentPage != null ? Number(currentPage) : 1);
       const total = totalPages && Number(totalPages) > 0 ? Number(totalPages) : Math.max(1, page);
       const progressPercent = Math.min(100, Math.max(1, Math.round((page / total) * 100)));

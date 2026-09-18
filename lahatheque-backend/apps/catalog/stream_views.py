@@ -4,6 +4,7 @@ Conforme aux spécifications DRM de LAHAThèque (docs/drm/01-architecture-cible.
 """
 
 import logging
+import os
 import re
 from typing import Optional, Tuple
 from django.conf import settings
@@ -132,10 +133,10 @@ class BookStreamView(APIView):
             "is_partner": False,
         }
 
-        # 4. Obtention du dérivé filigrané en cache (ségrégation par langue demandée)
+        # 4. Obtention du dérivé filigrané sur SSD local (ségrégation par langue demandée)
         source_ref = f"{book_id}:{requested_lang}" if requested_lang else str(book_id)
         try:
-            pdf_bytes, total_size = DerivedMaterializer.get_or_create_derived(
+            cache_file_path, total_size, cache_key = DerivedMaterializer.get_or_create_derived_file_path(
                 source_type="catalog_book",
                 source_reference=source_ref,
                 user_info=user_info,
@@ -149,7 +150,21 @@ class BookStreamView(APIView):
                 "error": "Impossible de charger le document sécurisé."
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-        # 5. Détection de requête Range RFC 7233
+        safe_title = (doc_title or "document")[:50].replace('"', '')
+
+        # 5. Délégation Nginx X-Accel-Redirect si activé en production
+        if getattr(settings, 'USE_X_ACCEL_REDIRECT', False):
+            response = HttpResponse(content_type="application/pdf")
+            response["X-Accel-Redirect"] = f"/protected_derived/{cache_key}.pdf"
+            response["Content-Disposition"] = f'inline; filename="{safe_title}.pdf"'
+            response["Accept-Ranges"] = "bytes"
+            response["Cache-Control"] = "private, no-store, must-revalidate"
+            response["Pragma"] = "no-cache"
+            response["X-Content-Type-Options"] = "nosniff"
+            response["X-Frame-Options"] = "SAMEORIGIN"
+            return response
+
+        # 6. Détection de requête Range RFC 7233
         range_header = request.META.get("HTTP_RANGE")
         is_range_request = bool(range_header and range_header.startswith("bytes="))
 
@@ -186,38 +201,34 @@ class BookStreamView(APIView):
             except Exception as log_err:
                 logger.warning(f"Erreur enregistrement TraceAcces: {log_err}")
 
-        # 6. Traitement de l'en-tête HTTP Range (RFC 7233 : support 200 complet & 206 partiel)
+        # 7. Streaming non-bloquant depuis le SSD NVMe (Zéro allocation de 60 Mo en RAM)
         if is_range_request:
             start_byte, end_byte = self._parse_range_header(range_header, total_size)
 
             if start_byte is None or end_byte is None:
-                # Range Not Satisfiable
                 response = HttpResponse(status=status.HTTP_416_REQUESTED_RANGE_NOT_SATISFIABLE)
                 response["Accept-Ranges"] = "bytes"
                 response["Content-Range"] = f"bytes */{total_size}"
                 return response
 
-            # Découpage du fragment
-            chunk_data = pdf_bytes[start_byte : end_byte + 1]
-            chunk_length = len(chunk_data)
+            chunk_length = end_byte - start_byte + 1
+            with open(cache_file_path, "rb") as f:
+                f.seek(start_byte)
+                chunk_data = f.read(chunk_length)
 
-            # Réponse HTTP 206 Partial Content
             response = HttpResponse(chunk_data, status=status.HTTP_206_PARTIAL_CONTENT, content_type="application/pdf")
             response["Content-Range"] = f"bytes {start_byte}-{end_byte}/{total_size}"
             response["Content-Length"] = str(chunk_length)
         else:
-            # Réponse complète HTTP 200 (négociation initiale requise par PDF.js / FlipBook)
-            chunk_data = pdf_bytes
-            response = HttpResponse(chunk_data, status=status.HTTP_200_OK, content_type="application/pdf")
+            from django.http import FileResponse
+            response = FileResponse(open(cache_file_path, "rb"), content_type="application/pdf")
             response["Content-Length"] = str(total_size)
 
-        # 7. En-têtes de sécurité et streaming
         response["Accept-Ranges"] = "bytes"
         response["Cache-Control"] = "private, no-store, must-revalidate"
         response["Pragma"] = "no-cache"
         response["X-Content-Type-Options"] = "nosniff"
         response["X-Frame-Options"] = "SAMEORIGIN"
-        safe_title = (doc_title or "document")[:50].replace('"', '')
         response["Content-Disposition"] = f'inline; filename="{safe_title}.pdf"'
         return response
 
@@ -524,9 +535,10 @@ class BookStreamInitiateView(APIView):
             user_info=user_info,
             config=global_config
         )
-        redis_cache_key = f"drm_derived:{cache_key}"
+        cache_dir = getattr(settings, "DRM_DERIVED_CACHE_DIR", os.path.join(settings.BASE_DIR, "var", "drm_cache"))
+        cache_file_path = os.path.join(cache_dir, f"{cache_key}.pdf")
 
-        if django_cache.get(redis_cache_key) is not None:
+        if (os.path.exists(cache_file_path) and os.path.getsize(cache_file_path) > 0) or django_cache.get(f"drm_derived:{cache_key}") is not None:
             return Response({"success": True, "data": {"status": "ready"}})
 
         from apps.protection.tasks import prepare_derived_document_task
@@ -570,9 +582,10 @@ class BookStreamStatusView(APIView):
             user_info=user_info,
             config=global_config
         )
-        redis_cache_key = f"drm_derived:{cache_key}"
+        cache_dir = getattr(settings, "DRM_DERIVED_CACHE_DIR", os.path.join(settings.BASE_DIR, "var", "drm_cache"))
+        cache_file_path = os.path.join(cache_dir, f"{cache_key}.pdf")
 
-        is_ready = django_cache.get(redis_cache_key) is not None
+        is_ready = (os.path.exists(cache_file_path) and os.path.getsize(cache_file_path) > 0) or (django_cache.get(f"drm_derived:{cache_key}") is not None)
         return Response({"success": True, "data": {"status": "ready" if is_ready else "preparing"}})
 
 

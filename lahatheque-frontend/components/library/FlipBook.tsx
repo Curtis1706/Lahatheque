@@ -87,6 +87,7 @@ interface FlipBookProps {
   availableLanguages?: string[];
   currentLanguage?: string;
   onLanguageChange?: (language: string) => void;
+  httpHeaders?: Record<string, string>;
 }
 
 // ─── Page Component (display only) ───────────────────────────
@@ -286,6 +287,7 @@ export const FlipBookReader: React.FC<FlipBookProps> = ({
   availableLanguages,
   currentLanguage,
   onLanguageChange,
+  httpHeaders,
 }) => {
   const [numPages, setNumPages]     = useState<number>(0);
   const [pages, setPages]           = useState<string[]>([]);
@@ -420,6 +422,7 @@ export const FlipBookReader: React.FC<FlipBookProps> = ({
           pdfSource = {
             url: absoluteUrl,
             withCredentials: true,
+            ...(httpHeaders ? { httpHeaders } : {}),
             rangeChunkSize: 131072, // Streaming haute performance par fragments de 128 Ko
             disableAutoFetch: true, // Évite de précharger inutilement tout le document
             disableStream: true,    // Active le vrai découpage par fragments HTTP 206 RFC 7233 sans télécharger tout le PDF
@@ -490,7 +493,7 @@ export const FlipBookReader: React.FC<FlipBookProps> = ({
     return () => {
       isCancelled = true;
     };
-  }, [fileUrl, bookId, hideQuiz, isSample, isMobile, renderPage]);
+  }, [fileUrl, bookId, hideQuiz, isSample, isMobile, renderPage, httpHeaders]);
 
   // ── Lazy load nearby pages avec cache et traitement parallèle ──
   useEffect(() => {

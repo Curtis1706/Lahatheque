@@ -116,6 +116,8 @@ export interface ProgressSyncPayload {
 const RAW_API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
 const API_BASE_URL = RAW_API_URL.endsWith("/v1") ? RAW_API_URL : `${RAW_API_URL.replace(/\/+$/, "")}/v1`;
 
+const lastHostedProgressTimestamps: Record<string, number> = {};
+
 export const hostedReaderApi = {
   /**
    * Récupère le jeton secret de terminal lié stocké pour cette session.
@@ -199,9 +201,18 @@ export const hostedReaderApi = {
 
   /**
    * Synchronise la page courante et le temps de lecture passé.
+   * Débouncé à 30 secondes pour ne pas surcharger le serveur lors des changements rapides de page.
    */
-  async syncProgress(payload: ProgressSyncPayload): Promise<void> {
+  async syncProgress(payload: ProgressSyncPayload, force: boolean = false): Promise<void> {
     try {
+      const now = Date.now();
+      const tokenKey = payload.token ? payload.token.slice(0, 32) : "default";
+      const lastSync = lastHostedProgressTimestamps[tokenKey] || 0;
+      if (!force && (now - lastSync < 30000)) {
+        return;
+      }
+      lastHostedProgressTimestamps[tokenKey] = now;
+
       const activeToken = this.getActiveToken(payload.token);
       const deviceToken = this.getDeviceBindingToken(payload.token);
       const headers: Record<string, string> = {

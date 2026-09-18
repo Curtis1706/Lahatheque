@@ -642,7 +642,8 @@ class StudentUpdateReadingProgressView(APIView):
         except Exception as trace_err:
             logger.warning(f"Erreur synchronisation TraceAcces depuis progress: {trace_err}")
 
-        invalidate_student_books_cache(user.id)
+        # Note: on ne détruit plus le cache de la bibliothèque à chaque seconde de progression
+        # pour éviter l'épuisement des workers et la saturation de PostgreSQL.
 
         return Response({
             'success': True,

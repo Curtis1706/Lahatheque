@@ -23,8 +23,8 @@ if [ "$1" = "gunicorn" ] || [ "$1" = "web" ]; then
     echo "==> Lancement du serveur Gunicorn WSGI..."
     exec gunicorn config.wsgi:application \
         --bind 0.0.0.0:${PORT:-8000} \
-        --workers ${GUNICORN_WORKERS:-3} \
-        --threads ${GUNICORN_THREADS:-2} \
+        --workers ${GUNICORN_WORKERS:-4} \
+        --threads ${GUNICORN_THREADS:-3} \
         --timeout ${GUNICORN_TIMEOUT:-300} \
         --access-logfile - \
         --error-logfile -

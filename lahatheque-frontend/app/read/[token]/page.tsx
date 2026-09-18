@@ -137,32 +137,14 @@ export default function HostedReaderPage() {
     setCurrentPage(newPage1Based);
 
     try {
-      const targetUrl = `/api/bff/reader/sessions/stream/?lang=${newLang}`;
       const activeToken = session?.session_token || hostedReaderApi.getActiveToken(token) || token;
-      const deviceToken = hostedReaderApi.getDeviceBindingToken(token);
-      const streamHeaders: Record<string, string> = {
-        Accept: "application/pdf",
-        "X-Reader-Token": activeToken,
-      };
-      if (deviceToken) {
-        streamHeaders["X-Reader-Device-Token"] = deviceToken;
-      }
-      const streamRes = await fetch(targetUrl, {
-        headers: streamHeaders,
-        credentials: "include",
-      });
-      if (streamRes.ok) {
-        const blob = await streamRes.blob();
-        if (blob && blob.size > 100) {
-          const blobUrl = URL.createObjectURL(blob);
-          setRawPdfData(blobUrl);
-          toast.success(`Langue basculée en ${newLang.toUpperCase()} (Page ${newPage1Based})`);
-        }
-      }
+      const targetUrl = `/api/bff/reader/sessions/stream/?lang=${newLang}&token=${encodeURIComponent(activeToken)}`;
+      setRawPdfData(targetUrl);
+      toast.success(`Langue basculée en ${newLang.toUpperCase()} (Page ${newPage1Based})`);
     } catch (err) {
       console.warn("Erreur lors de la bascule de langue:", err);
     }
-  }, [currentLanguage, currentPage, totalPages, token]);
+  }, [currentLanguage, currentPage, totalPages, token, session]);
 
   // Annotations & Notes State
   const [notes, setNotes] = useState<any[]>([]);
@@ -219,53 +201,52 @@ export default function HostedReaderPage() {
     };
   }, [token]);
 
-  // Chargement ultra-sécurisé du PDF en mémoire (Blob URL) pour éliminer les erreurs 204 et blocages IDM
+  // Chargement ultra-sécurisé du PDF en streaming fragmenté HTTP 206 (RFC 7233)
   const [rawPdfData, setRawPdfData] = useState<string | null>(null);
 
+  const streamHeaders = useMemo(() => {
+    const activeToken = session?.session_token || hostedReaderApi.getActiveToken(token) || token;
+    const deviceToken = hostedReaderApi.getDeviceBindingToken(token);
+    const headers: Record<string, string> = {
+      "X-Reader-Token": activeToken,
+    };
+    if (deviceToken) {
+      headers["X-Reader-Device-Token"] = deviceToken;
+    }
+    return headers;
+  }, [session, token]);
+
   useEffect(() => {
-    if (!session) return;
-    let isCancelled = false;
+    if (!session || !token) return;
 
-    // Le flux protégé exige le token de session en en-tête X-Reader-Token —
-    // jamais de lien direct vers le fichier brut.
+    // Le flux protégé est servi directement par fragments Range sans téléchargement préalable de Blob
     const initialLang = (session.book?.language || currentLanguage || "fr").toLowerCase();
-    const targetUrl = `/api/bff/reader/sessions/stream/?lang=${initialLang}`;
-    if (!token) return;
+    const activeToken = session?.session_token || hostedReaderApi.getActiveToken(token) || token;
+    const targetUrl = `/api/bff/reader/sessions/stream/?lang=${initialLang}&token=${encodeURIComponent(activeToken)}`;
 
-    const loadBlob = async () => {
-      try {
-        const activeToken = session?.session_token || hostedReaderApi.getActiveToken(token) || token;
-        const deviceToken = hostedReaderApi.getDeviceBindingToken(token);
-        const streamHeaders: Record<string, string> = {
-          Accept: "application/pdf",
-          "X-Reader-Token": activeToken,
-        };
-        if (deviceToken) {
-          streamHeaders["X-Reader-Device-Token"] = deviceToken;
-        }
+    setRawPdfData(targetUrl);
+  }, [session, token, currentLanguage]);
 
-        const streamRes = await fetch(targetUrl, {
-          headers: streamHeaders,
-          credentials: "include",
-        });
-        if (streamRes.ok) {
-          const blob = await streamRes.blob();
-          if (blob && blob.size > 100 && !isCancelled) {
-            const blobUrl = URL.createObjectURL(blob);
-            setRawPdfData(blobUrl);
-          }
-        }
-      } catch (err) {
-        console.warn("[HostedReader] Erreur lors du chargement du flux PDF:", err);
-      }
+  const transformPdfGetDocumentParams = useCallback(
+    (options: any) => ({
+      ...options,
+      httpHeaders: streamHeaders,
+      withCredentials: true,
+      disableStream: true,
+      disableAutoFetch: true,
+      rangeChunkSize: 128 * 1024,
+    }),
+    [streamHeaders]
+  );
+
+  const setViewerRenderRange = useCallback((range: { startPage: number; numPages: number }) => {
+    const maxStart = Math.max(range.numPages - 4, 0);
+    const startPage = Math.max(0, Math.min(range.startPage - 1, maxStart));
+    return {
+      startPage,
+      endPage: Math.min(range.numPages - 1, startPage + 3),
     };
-
-    loadBlob();
-
-    return () => {
-      isCancelled = true;
-    };
-  }, [session]);
+  }, []);
 
   // Synchronisation au chargement du nombre de pages
   const handleDocumentLoad = useCallback(
@@ -842,6 +823,7 @@ export default function HostedReaderPage() {
             availableLanguages={availableLanguages}
             currentLanguage={currentLanguage}
             onLanguageChange={handleLanguageChange}
+            httpHeaders={streamHeaders}
           />
         ) : (
           /* Mode Normal Vertical avec @react-pdf-viewer (Boîte à outils complète + 4 onglets latéraux) */
@@ -863,6 +845,8 @@ export default function HostedReaderPage() {
                   viewMode={ViewMode.SinglePage}
                   defaultScale={SpecialZoomLevel.PageFit}
                   scrollMode={ScrollMode.Vertical}
+                  transformGetDocumentParams={transformPdfGetDocumentParams}
+                  setRenderRange={setViewerRenderRange}
                 />
               </div>
             </PdfWorker>

@@ -12,7 +12,7 @@ import uuid
 from django.conf import settings
 from django.core.cache import cache
 from django.db import transaction
-from django.http import HttpResponse, JsonResponse
+from django.http import HttpResponse, JsonResponse, FileResponse
 from django.utils import timezone
 from rest_framework import status, throttling as rest_framework_throttling
 from rest_framework.decorators import action
@@ -901,7 +901,7 @@ class ReaderProtectedStreamView(APIView):
 
     DEFAULT_CHUNK_SIZE = 256 * 1024
 
-    def get(self, request: Request) -> Union[Response, HttpResponse]:
+    def get(self, request: Request) -> Union[Response, HttpResponse, FileResponse]:
         from apps.protection.derived_materializer import DerivedMaterializer
         from apps.protection.models import ProtectionConfig, TraceAcces, GlobalDrmConfig
 
@@ -1003,7 +1003,7 @@ class ReaderProtectedStreamView(APIView):
 
                 source_ref = f"{session.ouvrage_id}:{requested_lang}" if requested_lang else str(session.ouvrage_id)
 
-                pdf_bytes, total_size = DerivedMaterializer.get_or_create_derived(
+                cache_file_path, total_size, cache_key = DerivedMaterializer.get_or_create_derived_file_path(
                     source_type="catalog_book",
                     source_reference=source_ref,
                     user_info=user_info,
@@ -1015,7 +1015,7 @@ class ReaderProtectedStreamView(APIView):
                     "allowed_document_sources": partner_quotas.get("allowed_document_sources", []),
                     "max_file_size_mb": partner_quotas.get("max_file_size_mb", 200),
                 }
-                pdf_bytes, total_size = DerivedMaterializer.get_or_create_derived(
+                cache_file_path, total_size, cache_key = DerivedMaterializer.get_or_create_derived_file_path(
                     source_type="external_url",
                     source_reference=session.custom_document_url,
                     user_info=user_info,
@@ -1034,7 +1034,21 @@ class ReaderProtectedStreamView(APIView):
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
-        # 4. Traitement du Range HTTP (Support HTTP 200 complet & HTTP 206 partiel)
+        safe_title = (doc_title or "document")[:50].replace('"', '')
+
+        # 4. Délégation Nginx X-Accel-Redirect si activé en production
+        if getattr(settings, 'USE_X_ACCEL_REDIRECT', False):
+            response = HttpResponse(content_type="application/pdf")
+            response["X-Accel-Redirect"] = f"/protected_derived/{cache_key}.pdf"
+            response["Content-Disposition"] = f'inline; filename="{safe_title}.pdf"'
+            response["Accept-Ranges"] = "bytes"
+            response["Cache-Control"] = "private, no-store, must-revalidate"
+            response["Pragma"] = "no-cache"
+            response["X-Content-Type-Options"] = "nosniff"
+            response["X-Frame-Options"] = "SAMEORIGIN"
+            return response
+
+        # 5. Traitement du Range HTTP (Support HTTP 200 complet & HTTP 206 partiel avec zero-copy)
         range_header = request.META.get("HTTP_RANGE")
         is_range_request = bool(range_header and range_header.startswith("bytes="))
 
@@ -1042,19 +1056,24 @@ class ReaderProtectedStreamView(APIView):
             start_byte, end_byte = self._parse_range_header(range_header, total_size)
             if start_byte is None or end_byte is None:
                 response = HttpResponse(status=status.HTTP_416_REQUESTED_RANGE_NOT_SATISFIABLE)
+                response["Accept-Ranges"] = "bytes"
                 response["Content-Range"] = f"bytes */{total_size}"
                 return response
 
-            chunk_data = pdf_bytes[start_byte:end_byte + 1]
+            chunk_length = end_byte - start_byte + 1
+            with open(cache_file_path, "rb") as f:
+                f.seek(start_byte)
+                chunk_data = f.read(chunk_length)
+
             response = HttpResponse(chunk_data, status=status.HTTP_206_PARTIAL_CONTENT, content_type="application/pdf")
             response["Content-Range"] = f"bytes {start_byte}-{end_byte}/{total_size}"
-            response["Content-Length"] = str(len(chunk_data))
+            response["Content-Length"] = str(chunk_length)
         else:
-            chunk_data = pdf_bytes
-            response = HttpResponse(chunk_data, status=status.HTTP_200_OK, content_type="application/pdf")
+            from django.http import FileResponse
+            response = FileResponse(open(cache_file_path, "rb"), content_type="application/pdf")
             response["Content-Length"] = str(total_size)
 
-        # 5. Journalisation légale
+        # 6. Journalisation légale
         try:
             doc_title = session.ouvrage.titre if session.ouvrage else session.custom_document_title
             TraceAcces.objects.create(
@@ -1074,7 +1093,6 @@ class ReaderProtectedStreamView(APIView):
         response["Pragma"] = "no-cache"  # S-11 : compatibilite proxies HTTP/1.0
         response["X-Content-Type-Options"] = "nosniff"
         response["X-Frame-Options"] = "SAMEORIGIN"  # S-11 : anti-clickjacking iframe
-        safe_title = (doc_title or "document")[:50].replace('"', '')
         response["Content-Disposition"] = f'inline; filename="{safe_title}.pdf"'  # S-11
         return response
 

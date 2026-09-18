@@ -248,7 +248,6 @@ export default function DocumentReaderPage() {
   const [pdfLoadError, setPdfLoadError] = useState<string | null>(null)
   const [drmSettings, setDrmSettings] = useState<any>(null)
   const [bookLanguageResolved, setBookLanguageResolved] = useState(false)
-  const [preparationLabel, setPreparationLabel] = useState<string>('Préparation de votre salle de lecture')
 
   const {
     isAudioPlaying,
@@ -626,21 +625,7 @@ export default function DocumentReaderPage() {
           }
           
           if (file) {
-            try {
-              const streamRes = await fetch(file, {
-                headers: { Accept: 'application/pdf' },
-                credentials: 'include',
-              });
-              if (streamRes.ok) {
-                const blob = await streamRes.blob();
-                const blobUrl = URL.createObjectURL(blob);
-                setRawPdfData(blobUrl);
-              } else {
-                setRawPdfData(file);
-              }
-            } catch {
-              setRawPdfData(file);
-            }
+            setRawPdfData(file);
           } else {
             setRawPdfData(null);
           }
@@ -670,41 +655,8 @@ export default function DocumentReaderPage() {
         const langQuery = initialLang ? `?lang=${encodeURIComponent(initialLang)}` : '';
         setBookLanguageResolved(true);
 
-        // Attente active et vérification du statut du document préparé (Fiches 1 & 4)
-        const waitForDocumentReady = async (bookId: string, lang: string): Promise<void> => {
-          if (isSampleMode || (data && data.file && !data.file.startsWith('/api/')) || id === 'lesson_pdf') {
-            return;
-          }
-          const maxAttempts = 30;
-          for (let i = 0; i < maxAttempts; i++) {
-            try {
-              const res = await fetch(`/api/bff/catalog/books/${bookId}/stream/status/?lang=${encodeURIComponent(lang)}`, {
-                credentials: "include",
-              });
-              if (res.ok) {
-                const statusJson = await res.json();
-                if (statusJson?.data?.status === "ready") return;
-              }
-            } catch {
-              // Ignore erreur réseau transitoire
-            }
-
-            if (i === 0) {
-              fetch(`/api/bff/catalog/books/${bookId}/stream/initiate/?lang=${encodeURIComponent(lang)}`, {
-                method: "POST",
-                credentials: "include",
-              }).catch(() => {});
-            }
-
-            setPreparationLabel(`Préparation du document sécurisé... (${i + 1}/${maxAttempts})`);
-            await new Promise((r) => setTimeout(r, 1500));
-          }
-        };
-
-        await waitForDocumentReady(id as string, initialLang);
-
-        // --- CHARGEMENT PROGRESSIF HAUTE PERFORMANCE (STREAMING HTTP 206) ---
-        // Transmet directement l'URL de streaming au lecteur une fois le document prêt et la langue déterminée
+        // --- CHARGEMENT PROGRESSIF HAUTE PERFORMANCE (STREAMING HTTP 206 RFC 7233) ---
+        // Transmet immédiatement l'URL de streaming au lecteur sans attente bloquante
         const targetStreamUrl = isSampleMode
           ? `/api/bff/catalog/books/${id}/sample/${langQuery}`
           : ((data && data.file && !data.file.startsWith('/api/')) ? data.file : (id === 'lesson_pdf' ? '' : `/api/bff/catalog/books/${id}/stream/${langQuery}`));
@@ -880,7 +832,7 @@ export default function DocumentReaderPage() {
   if (isLoading || !book || isPdfLoading || !bookLanguageResolved) {
     return (
       <div className="h-screen bg-background flex flex-col items-center justify-center">
-        <PageLoader label={isPdfLoading ? 'Chargement sécurisé du document' : (preparationLabel || 'Préparation de votre salle de lecture')} />
+        <PageLoader label={isPdfLoading ? 'Chargement sécurisé du document' : 'Préparation de votre salle de lecture'} />
       </div>
     )
   }

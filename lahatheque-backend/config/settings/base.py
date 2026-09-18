@@ -320,6 +320,7 @@ DRM_DERIVED_CACHE_DIR = config('DRM_DERIVED_CACHE_DIR', default=str(BASE_DIR / '
 DRM_DERIVED_CACHE_TTL_HOURS = config('DRM_DERIVED_CACHE_TTL_HOURS', default=24, cast=int)
 DRM_WATERMARK_DEFAULT_OPACITY = 0.20
 DRM_MAX_REMOTE_FILE_SIZE_MB = 800
+USE_X_ACCEL_REDIRECT = config('USE_X_ACCEL_REDIRECT', default=False, cast=bool)
 
 # ── Configuration Email (Resend & SMTP Professionnel Boîte Unique) ───────────
 EMAIL_PROVIDER = config('EMAIL_PROVIDER', default='resend')
@@ -407,3 +408,11 @@ CACHES = {
 # bouquets, section 8 — aucune validation d'affiliation universitaire n'est prévue). Le code
 # est conservé intact pour réactivation future si le besoin métier évolue.
 ENABLE_UNIVERSITY_AFFILIATION_GATING = False
+
+# Optimisation Streaming & Délégation Reverse Proxy (Nginx)
+USE_X_ACCEL_REDIRECT = config('USE_X_ACCEL_REDIRECT', default=False, cast=bool)
+DRM_DERIVED_CACHE_DIR = config(
+    'DRM_DERIVED_CACHE_DIR',
+    default=str(BASE_DIR / 'var' / 'drm_cache')
+)
+DRM_DERIVED_CACHE_TTL_HOURS = config('DRM_DERIVED_CACHE_TTL_HOURS', default=24, cast=int)

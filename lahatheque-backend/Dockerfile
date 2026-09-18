@@ -36,6 +36,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     DJANGO_SETTINGS_MODULE=config.settings.production \
     OMP_THREAD_LIMIT=1 \
     OMP_NUM_THREADS=1 \
+    GUNICORN_WORKERS=4 \
+    GUNICORN_THREADS=3 \
     PORT=8000
 
 # Paquets d'exécution nécessaires
