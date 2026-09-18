@@ -60,11 +60,13 @@ def compute_author_royalties_summary(user):
         book__in=ouvrages_qs
     ).exclude(order__status=WholesaleOrderStatus.CANCELLED).select_related('book')
 
+    all_reps = list(RepartitionDroits.objects.filter(ouvrage__in=ouvrages_qs))
+    user_reps_map = {r.ouvrage_id: r for r in all_reps if getattr(r, 'beneficiaire_id', None) == getattr(user, 'id', None)}
+    any_reps_map = {r.ouvrage_id: r for r in all_reps}
+
     total_earned = 0.0
     for o in ouvrages_qs:
-        rep = RepartitionDroits.objects.filter(ouvrage=o, beneficiaire=user).first()
-        if not rep:
-            rep = RepartitionDroits.objects.filter(ouvrage=o).first()
+        rep = user_reps_map.get(o.id) or any_reps_map.get(o.id)
         taux_num = float(rep.taux_numerique) if (rep and rep.taux_numerique is not None) else 10.0
         taux_pap = float(rep.taux_papier) if (rep and rep.taux_papier is not None) else 0.0
         taux_aud = float(rep.taux_audio_tts) if (rep and rep.taux_audio_tts is not None) else 0.0
@@ -136,6 +138,10 @@ def get_author_quarter_books(user, start_date_str, end_date_str):
         order__created_at__date__lte=end_date_str,
     ).exclude(order__status=WholesaleOrderStatus.CANCELLED).select_related('book')
 
+    all_reps_quarter = list(RepartitionDroits.objects.filter(ouvrage__in=ouvrages_qs))
+    user_reps_quarter_map = {r.ouvrage_id: r for r in all_reps_quarter if getattr(r, 'beneficiaire_id', None) == getattr(user, 'id', None)}
+    any_reps_quarter_map = {r.ouvrage_id: r for r in all_reps_quarter}
+
     books = []
     for o in ouvrages_qs:
         o_lignes = [l for l in lignes if l.ouvrage_id == o.id]
@@ -144,9 +150,7 @@ def get_author_quarter_books(user, start_date_str, end_date_str):
         if not o_lignes and not o_w:
             continue
 
-        rep = RepartitionDroits.objects.filter(ouvrage=o, beneficiaire=user).first()
-        if not rep:
-            rep = RepartitionDroits.objects.filter(ouvrage=o).first()
+        rep = user_reps_quarter_map.get(o.id) or any_reps_quarter_map.get(o.id)
         taux_num = float(rep.taux_numerique) if (rep and rep.taux_numerique is not None) else 10.0
         taux_pap = float(rep.taux_papier) if (rep and rep.taux_papier is not None) else 0.0
         taux_aud = float(rep.taux_audio_tts) if (rep and rep.taux_audio_tts is not None) else 0.0
@@ -2511,7 +2515,7 @@ class LegalPreEditionDetailView(APIView):
         return Response({"success": True, "message": "Dossier de pré-édition supprimé avec succès."})
 
 
-def get_period_date_range(period_type: str, year: int, month: int = None, quarter: int = None):
+def get_period_date_range(period_type: str, year: int, month: int | None = None, quarter: int | None = None):
     from datetime import date
     import calendar
     if period_type == "monthly" and month and year:

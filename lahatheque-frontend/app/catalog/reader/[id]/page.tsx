@@ -860,6 +860,8 @@ export default function DocumentReaderPage() {
             onClick={() => router.push('/catalog')}
             variant="ghost"
             size="icon"
+            aria-label="Retour au catalogue"
+            title="Retour au catalogue"
             className="h-9 w-9 rounded-lg inline-flex items-center justify-center p-0 text-gold bg-navy-dark hover:bg-navy border border-navy-hover cursor-pointer shrink-0 transition-colors"
           >
             <ArrowLeft size={18} />
@@ -908,6 +910,8 @@ export default function DocumentReaderPage() {
             onClick={() => router.push('/catalog')}
             variant="ghost"
             size="icon"
+            aria-label="Retour au catalogue"
+            title="Retour au catalogue"
             className="h-9 w-9 rounded-lg inline-flex items-center justify-center p-0 text-gold bg-navy-dark hover:bg-navy border border-navy-hover cursor-pointer shrink-0 transition-colors"
           >
             <ArrowLeft size={18} />
@@ -962,6 +966,8 @@ export default function DocumentReaderPage() {
               onClick={() => router.back()}
               variant="ghost"
               size="icon"
+              aria-label="Retour à la page précédente"
+              title="Retour à la page précédente"
               className="h-9 w-9 rounded-lg inline-flex items-center justify-center p-0 text-gold bg-navy-dark hover:bg-navy border border-navy-hover cursor-pointer shrink-0 transition-colors"
             >
               <ArrowLeft size={18} />
@@ -1122,6 +1128,8 @@ export default function DocumentReaderPage() {
             }}
             variant="ghost"
             size="icon"
+            aria-label="Retour à la page précédente"
+            title="Retour à la page précédente"
             className="h-9 w-9 rounded-lg inline-flex items-center justify-center p-0 text-gold bg-navy-dark hover:bg-navy border border-navy-hover cursor-pointer shrink-0 transition-colors"
           >
             <ArrowLeft size={18} />

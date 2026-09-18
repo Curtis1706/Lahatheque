@@ -476,21 +476,36 @@ class DocumentSourceAdapter:
 
         hostname_lower = hostname.lower()
 
-        # Blocage des noms d'hôtes localhost évidents (sauf en DEBUG de développement)
+        # SEC-10 / Anti-SSRF: Restriction stricte des ports autorisés (uniquement HTTP 80 et HTTPS 443)
+        port = parsed.port
+        if port is not None and port not in (80, 443):
+            raise DocumentSourceError(f"Port réseau non autorisé: {port}. Seuls les ports web standards (80, 443) sont acceptés.")
+
+        # Blocage inconditionnel des noms d'hôtes loopback et d'adresses de métadonnées Cloud
         blocked_hosts = {"localhost", "127.0.0.1", "0.0.0.0", "::1", "169.254.169.254"}
-        if hostname_lower in blocked_hosts and not getattr(settings, "DEBUG", False):
+        allow_local_test = getattr(settings, "ALLOW_LOCAL_REMOTE_FETCH", False)
+        if hostname_lower in blocked_hosts and not allow_local_test:
             raise DocumentSourceError("Accès aux adresses loopback et métadonnées interdit (Anti-SSRF).")
 
-        # Résolution DNS pour vérifier les adresses IP privées (désactivé en mode DEBUG de développement)
-        if not getattr(settings, "DEBUG", False):
+        # Résolution DNS stricte et contrôle de chaque IP (Anti-SSRF et filtrage plages privées)
+        if not allow_local_test:
             try:
                 ip_info = socket.getaddrinfo(hostname, None)
+                if not ip_info:
+                    raise DocumentSourceError(f"Impossible de résoudre le domaine distant: {hostname}")
                 for item in ip_info:
                     ip_str = item[4][0]
                     ip_obj = ipaddress.ip_address(ip_str)
-                    if ip_obj.is_private or ip_obj.is_loopback or ip_obj.is_reserved or ip_obj.is_link_local:
+                    if (
+                        ip_obj.is_private
+                        or ip_obj.is_loopback
+                        or ip_obj.is_reserved
+                        or ip_obj.is_link_local
+                        or ip_obj.is_multicast
+                        or ip_obj.is_unspecified
+                    ):
                         raise DocumentSourceError(
-                            f"L'adresse IP cible ({ip_str}) est privée ou réservée. Requête bloquée par la sécurité Anti-SSRF."
+                            f"L'adresse IP cible ({ip_str}) est privée, réservée ou locale. Requête bloquée par la sécurité Anti-SSRF."
                         )
             except socket.gaierror:
                 raise DocumentSourceError(f"Impossible de résoudre le domaine distant: {hostname}")
