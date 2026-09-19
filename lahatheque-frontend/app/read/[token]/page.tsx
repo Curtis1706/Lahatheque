@@ -231,7 +231,7 @@ export default function HostedReaderPage() {
     // Pour permettre les requêtes partielles HTTP 206 RFC 7233 sans dégradation ni stripping
     // des en-têtes Content-Length / Accept-Ranges par le proxy intermédiaire Node.js BFF,
     // on résout l'URL de streaming direct vers l'API backend Django en environnement navigateur.
-    const initialLang = (session.book?.language || currentLanguage || "fr").toLowerCase();
+    const initialLang = (currentLanguage || session.book?.language || "fr").toLowerCase();
     const activeToken = session?.session_token || hostedReaderApi.getActiveToken(token) || token;
     let targetUrl: string;
     if (typeof window !== "undefined") {
@@ -252,7 +252,7 @@ export default function HostedReaderPage() {
     (page: number) => {
       const activeToken = session?.session_token || hostedReaderApi.getActiveToken(token) || token;
       const deviceToken = session?.device_binding_token || hostedReaderApi.getDeviceBindingToken(token);
-      const initialLang = (session?.book?.language || currentLanguage || "fr").toLowerCase();
+      const initialLang = (currentLanguage || session?.book?.language || "fr").toLowerCase();
       const deviceParam = deviceToken ? `&device_token=${encodeURIComponent(deviceToken)}` : "";
       if (typeof window !== "undefined") {
         const isProd = window.location.hostname.includes("lahatheque.com");
