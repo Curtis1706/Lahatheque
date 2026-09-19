@@ -136,6 +136,12 @@ export default function HostedReaderPage() {
     setCurrentLanguage(newLang);
     setCurrentPage(newPage1Based);
 
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      url.searchParams.set("lang", newLang);
+      window.history.replaceState({}, "", url.toString());
+    }
+
     try {
       const activeToken = session?.session_token || hostedReaderApi.getActiveToken(token) || token;
       let targetUrl: string;
